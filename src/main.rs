@@ -3,7 +3,7 @@ extern crate nalgebra;
 
 use image::{ImageBuffer, Rgb, Pixel};
 
-use nalgebra::{cross, dot, normalize, Norm};
+use nalgebra::{cross, dot, Norm};
 
 type Vec3 = nalgebra::Vec3<f32>;
 
@@ -18,7 +18,7 @@ struct Ray {
 
 impl Ray {
     fn new(origin: Vec3, dir: Vec3) -> Self {
-        Ray { origin: origin, dir: normalize(&dir) }
+        Ray { origin: origin, dir: dir.normalize() }
     }
 }
 
@@ -26,16 +26,21 @@ impl Ray {
 #[derive(Debug)]
 struct Intersection {
     pos: Vec3,
+    normal: Vec3,
 }
 
 impl Intersection {
-    fn new(pos: Vec3) -> Self {
-        Intersection { pos: pos }
+    fn new(pos: Vec3, normal: Vec3) -> Self {
+        Intersection { pos: pos, normal: normal }
     }
 }
 
 trait Surface {
-    fn intersect(&self, ray: &Ray) -> Option<Intersection>;
+    fn intersect(&self, &Ray) -> Option<Intersection>;
+}
+
+trait Material {
+    fn color(&self, ray: &Ray, &Intersection) -> (u8, u8, u8);
 }
 
 struct Sphere {
@@ -51,14 +56,44 @@ impl Surface for Sphere {
 
         let discriminant = b * b - 4. * c;
 
-        if discriminant > 0. {
-            // TODO: What about the other solution?
-            let d = -b - discriminant.sqrt();
+        if discriminant >= 0. {
+            let disc_sqrt = discriminant.sqrt();
+            let d1 = -0.5 * (-b - disc_sqrt);
+            let d2 = -0.5 * (-b + disc_sqrt);
+            // TODO: Double check this
+            let d = if d1 > 0. {
+                d1
+            } else if d2 > 0. {
+                d2
+            } else {
+                return None
+            };
+
             let pos = ray.origin + ray.dir * d;
-            Some(Intersection::new(pos))
+            let normal = (pos - self.pos).normalize();
+            Some(Intersection::new(pos, normal))
         } else {
             None
         }
+    }
+}
+
+struct DiffuseMaterial {
+    color: (u8, u8, u8),
+}
+
+impl DiffuseMaterial {
+    fn new(color: (u8, u8, u8)) -> Self {
+        DiffuseMaterial { color: color }
+    }
+}
+
+impl Material for DiffuseMaterial {
+    fn color(&self, ray: &Ray, intersection: &Intersection) -> (u8, u8, u8) {
+        let f = f32::max(0., dot(&intersection.normal, &ray.dir));
+        ((self.color.0 as f32 * f) as u8,
+         (self.color.1 as f32 * f) as u8,
+         (self.color.2 as f32 * f) as u8)
     }
 }
 
@@ -77,9 +112,9 @@ struct Camera {
 
 impl Camera {
     fn new(pos: Vec3, dir: Vec3, up: Vec3) -> Self {
-        let right = normalize(&cross(&up, &dir));
-        let up = normalize(&cross(&right, &dir));
-        Camera { pos: pos, dir: normalize(&dir), up: up, right: right }
+        let right = cross(&up, &dir).normalize();
+        let up = cross(&right, &dir).normalize();
+        Camera { pos: pos, dir: dir.normalize(), up: up, right: right }
     }
 
     fn from_lookat(pos: Vec3, lookat: Vec3, up: Vec3) -> Self {
@@ -97,7 +132,6 @@ impl Camera {
 }
 
 fn main() {
-    let sphere_color: Rgb<u8> = Rgb::from_channels(255, 0, 0, 1);
     let mut im: ImageBuffer<Rgb<u8>, _> = ImageBuffer::new(WIDTH, HEIGHT);
 
     let camera = {
@@ -107,12 +141,15 @@ fn main() {
         Camera::from_lookat(pos, lookat, up)
     };
     let sphere = Sphere::new(Vec3::new(0., 0., 0.), 1.);
+    let material = DiffuseMaterial::new((0, 0, 255));
 
     for x in 0..WIDTH {
         for y in 0..HEIGHT {
             let ray = camera.get_ray(x, y);
-            if let Some(_) = sphere.intersect(&ray) {
-                im.put_pixel(x, y, sphere_color);
+            if let Some(intersection) = sphere.intersect(&ray) {
+                let color = material.color(&ray, &intersection);
+                let color = Rgb::from_channels(color.0, color.1, color.2, 255);
+                im.put_pixel(x, y, color);
             }
         }
     }
