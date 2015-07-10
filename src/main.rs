@@ -22,16 +22,16 @@ impl Ray {
     }
 }
 
-#[allow(dead_code)]
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct Intersection {
     pos: Vec3,
     normal: Vec3,
+    dist: f32,
 }
 
 impl Intersection {
-    fn new(pos: Vec3, normal: Vec3) -> Self {
-        Intersection { pos: pos, normal: normal }
+    fn new(pos: Vec3, normal: Vec3, dist: f32) -> Self {
+        Intersection { pos: pos, normal: normal, dist: dist }
     }
 }
 
@@ -43,6 +43,7 @@ trait Material {
     fn color(&self, ray: &Ray, &Intersection) -> (u8, u8, u8);
 }
 
+#[derive(Clone, Debug)]
 struct Sphere {
     pos: Vec3,
     radius: f32,
@@ -76,7 +77,7 @@ impl Surface for Sphere {
 
             let pos = ray.origin + ray.dir * d;
             let normal = (pos - self.pos).normalize();
-            Some(Intersection::new(pos, normal))
+            Some(Intersection::new(pos, normal, d))
         } else {
             None
         }
@@ -118,6 +119,43 @@ struct Camera {
     right: Vec3,
 }
 
+struct PointLight {
+    intensity: f32,
+}
+
+impl PointLight {
+    fn new(intensity: f32) -> Self {
+        PointLight { intensity: intensity }
+    }
+}
+
+struct Scene {
+    objects: Vec<Sphere>,
+    lights: Vec<PointLight>,
+    ambient_const: f32,
+    camera: Camera,
+}
+
+impl Scene {
+    fn new(objects: Vec<Sphere>, lights: Vec<PointLight>, ambient: f32, camera: Camera) -> Self {
+        Scene { objects: objects, lights: lights, ambient_const: ambient, camera: camera }
+    }
+
+    fn intersect(&self, ray: &Ray) -> Option<(&Sphere, Intersection)> {
+        let mut result = None;
+        for obj in self.objects.iter() {
+            if let Some(hit) = obj.intersect(ray) {
+                match result.clone() {
+                    None => result = Some((obj, hit)),
+                    Some((_, ref old_hit)) =>
+                        if hit.dist < old_hit.dist { result = Some((obj, hit)) }
+                }
+            }
+        }
+        result
+    }
+}
+
 impl Camera {
     fn new(pos: Vec3, dir: Vec3, up: Vec3) -> Self {
         let right = cross(&up, &dir).normalize();
@@ -150,12 +188,15 @@ fn main() {
     };
     let sphere = Sphere::new(Vec3::new(0., 0., 0.), 1.);
     let material = DiffuseMaterial::new(0.7, (0, 0, 255));
+    let light = PointLight::new(1.);
+
+    let scene = Scene::new(vec![sphere], vec![light], 1., camera);
 
     for x in 0..WIDTH {
         for y in 0..HEIGHT {
-            let ray = camera.get_ray(x, y);
-            if let Some(intersection) = sphere.intersect(&ray) {
-                let color = material.color(&ray, &intersection);
+            let ray = scene.camera.get_ray(x, y);
+            if let Some((_, hit)) = scene.intersect(&ray) {
+                let color = material.color(&ray, &hit);
                 let color = Rgb::from_channels(color.0, color.1, color.2, 255);
                 im.put_pixel(x, y, color);
             }
