@@ -50,22 +50,27 @@ struct Sphere {
 
 impl Surface for Sphere {
     fn intersect(&self, ray: &Ray) -> Option<Intersection> {
-        let center_offset = self.pos - ray.origin;
+        let center_offset = ray.origin - self.pos;
         let b = 2. * dot(&ray.dir, &center_offset);
         let c = center_offset.sqnorm() - self.radius * self.radius;
 
         let discriminant = b * b - 4. * c;
 
         if discriminant >= 0. {
+            //println!("{:?} {:?}", ray.origin, ray.dir);
+
             let disc_sqrt = discriminant.sqrt();
-            let d1 = -0.5 * (-b - disc_sqrt);
-            let d2 = -0.5 * (-b + disc_sqrt);
-            // TODO: Double check this
-            let d = if d1 > 0. {
-                d1
-            } else if d2 > 0. {
+            let d1 = 0.5 * (-b + disc_sqrt);
+            let d2 = 0.5 * (-b - disc_sqrt);
+
+            // d1 should always be larger than d2, we want the smallest positive distance
+            let d = if d2 > 0. {
                 d2
+            } else if d1 > 0. {
+                // We are inside the sphere
+                d1
             } else {
+                // Both are negative, sphere is behind camera
                 return None
             };
 
@@ -79,18 +84,21 @@ impl Surface for Sphere {
 }
 
 struct DiffuseMaterial {
+    intensity: f32,
     color: (u8, u8, u8),
 }
 
 impl DiffuseMaterial {
-    fn new(color: (u8, u8, u8)) -> Self {
-        DiffuseMaterial { color: color }
+    fn new(intensity: f32, color: (u8, u8, u8)) -> Self {
+        DiffuseMaterial { intensity: intensity, color: color }
     }
 }
 
 impl Material for DiffuseMaterial {
     fn color(&self, ray: &Ray, intersection: &Intersection) -> (u8, u8, u8) {
-        let f = f32::max(0., dot(&intersection.normal, &ray.dir));
+        // Note: ray direction has to be flipped
+        let f = f32::max(0., dot(&intersection.normal, &-ray.dir));
+        let f = f * self.intensity;
         ((self.color.0 as f32 * f) as u8,
          (self.color.1 as f32 * f) as u8,
          (self.color.2 as f32 * f) as u8)
@@ -141,7 +149,7 @@ fn main() {
         Camera::from_lookat(pos, lookat, up)
     };
     let sphere = Sphere::new(Vec3::new(0., 0., 0.), 1.);
-    let material = DiffuseMaterial::new((0, 0, 255));
+    let material = DiffuseMaterial::new(0.7, (0, 0, 255));
 
     for x in 0..WIDTH {
         for y in 0..HEIGHT {
