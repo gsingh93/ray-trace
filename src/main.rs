@@ -1,19 +1,24 @@
 extern crate image;
 extern crate nalgebra;
 
+mod surface;
+
 use std::f32;
+
+use surface::{Plane, Sphere, Surface};
 
 use image::{ImageBuffer, Rgb, Pixel};
 
 use nalgebra::{clamp, cross, dot, Norm};
 
-type Vec3 = nalgebra::Vec3<f32>;
+pub type Vec3 = nalgebra::Vec3<f32>;
 
 const OUT_FILE: &'static str = "image.png";
 const WIDTH: u32 = 640;
 const HEIGHT: u32 = 480;
 
-struct Ray {
+#[derive(Debug)]
+pub struct Ray {
     origin: Vec3,
     dir: Vec3,
 }
@@ -25,7 +30,7 @@ impl Ray {
 }
 
 #[derive(Clone, Debug)]
-struct Intersection {
+pub struct Intersection {
     pos: Vec3,
     normal: Vec3,
     dist: f32,
@@ -37,53 +42,9 @@ impl Intersection {
     }
 }
 
-trait Surface {
-    fn intersect(&self, &Ray) -> Option<Intersection>;
-}
 
 trait Material {
-    fn color(&self, ray: &Ray, &Intersection, camera: &Camera) -> Vec3;
-}
-
-#[derive(Clone, Debug)]
-struct Sphere {
-    pos: Vec3,
-    radius: f32,
-}
-
-impl Surface for Sphere {
-    fn intersect(&self, ray: &Ray) -> Option<Intersection> {
-        let center_offset = ray.origin - self.pos;
-        let b = 2. * dot(&ray.dir, &center_offset);
-        let c = center_offset.sqnorm() - self.radius * self.radius;
-
-        let discriminant = b * b - 4. * c;
-
-        if discriminant >= 0. {
-            //println!("{:?} {:?}", ray.origin, ray.dir);
-
-            let disc_sqrt = discriminant.sqrt();
-            let d1 = 0.5 * (-b + disc_sqrt);
-            let d2 = 0.5 * (-b - disc_sqrt);
-
-            // d1 should always be larger than d2, we want the smallest positive distance
-            let d = if d2 > 0. {
-                d2
-            } else if d1 > 0. {
-                // We are inside the sphere
-                d1
-            } else {
-                // Both are negative, sphere is behind camera
-                return None
-            };
-
-            let pos = ray.origin + ray.dir * d;
-            let normal = (pos - self.pos).normalize();
-            Some(Intersection::new(pos, normal, d))
-        } else {
-            None
-        }
-    }
+    fn color(&self, shadow_ray: &Ray, camera_ray: &Ray, &Intersection) -> Vec3;
 }
 
 struct SphereMaterial {
@@ -100,23 +61,16 @@ impl SphereMaterial {
 }
 
 impl Material for SphereMaterial {
-    fn color(&self, ray: &Ray, hit: &Intersection, /* TODO: incoming ray */camera: &Camera) -> Vec3 {
-        let f = f32::max(0., dot(&hit.normal, &ray.dir));
+    fn color(&self, shadow_ray: &Ray, camera_ray: &Ray, hit: &Intersection) -> Vec3 {
+        let f = f32::max(0., dot(&hit.normal, &shadow_ray.dir));
         let diffuse_color = self.color * f * self.diffuse_coeff;
 
-        let camera_dir = camera.pos - hit.pos;
-        let half_vec = ((ray.dir + camera_dir) / 2.).normalize();
+        let half_vec = ((shadow_ray.dir + camera_ray.dir) / 2.).normalize();
         let f = f32::max(0., dot(&half_vec, &hit.normal)).powi(10); // TODO
         // TODO
         let specular_color = Vec3::new(255., 255., 255.) * f * self.specular_coeff;
 
         diffuse_color + specular_color
-    }
-}
-
-impl Sphere {
-    fn new(pos: Vec3, radius: f32) -> Self {
-        Sphere { pos: pos, radius: radius }
     }
 }
 
@@ -140,7 +94,7 @@ impl PointLight {
 }
 
 struct Scene {
-    objects: Vec<Sphere>,
+    objects: Vec<Box<Surface>>,
     lights: Vec<PointLight>,
     ambient_coeff: f32,
     ambient_color: Vec3,
@@ -148,7 +102,7 @@ struct Scene {
 }
 
 impl Scene {
-    fn new(objects: Vec<Sphere>,
+    fn new(objects: Vec<Box<Surface>>,
            lights: Vec<PointLight>,
            ambient_coeff: f32,
            ambient_color: Vec3,
@@ -162,7 +116,7 @@ impl Scene {
         }
     }
 
-    fn intersect(&self, ray: &Ray) -> Option<(&Sphere, Intersection)> {
+    fn intersect(&self, ray: &Ray) -> Option<(&Box<Surface>, Intersection)> {
         let mut result = None;
         for obj in self.objects.iter() {
             if let Some(hit) = obj.intersect(ray) {
@@ -202,16 +156,19 @@ fn main() {
     let mut im: ImageBuffer<Rgb<u8>, _> = ImageBuffer::new(WIDTH, HEIGHT);
 
     let camera = {
-        let pos = Vec3::new(0., 0., -4.);
+        let pos = Vec3::new(0., 1., -4.);
         let lookat = Vec3::new(0., 0., 0.);
         let up = Vec3::new(0., 1., 0.);
         Camera::from_lookat(pos, lookat, up)
     };
+    let plane = Plane::new(Vec3::new(0., 0., 0.), Vec3::new(0., 1., 0.));
     let sphere = Sphere::new(Vec3::new(0., 0., 0.), 1.);
     let material = SphereMaterial::new(Vec3::new(0., 0., 255.), 0.7, 0.);
     let light = PointLight::new(Vec3::new(4., 4., 0.), Vec3::new(0., 255., 0.), 2.);
 
-    let scene = Scene::new(vec![sphere], vec![light], 0.1, Vec3::new(255., 255., 255.), camera);
+    let scene = Scene::new(vec![Box::new(sphere), Box::new(plane)],
+                           vec![light],
+                           0.1, Vec3::new(255., 255., 255.), camera);
 
     for x in 0..WIDTH {
         for y in 0..HEIGHT {
@@ -221,10 +178,9 @@ fn main() {
                 let mut color = material.color * scene.ambient_coeff;
                 for light in scene.lights.iter() {
                     let pos = hit.pos + hit.normal * f32::EPSILON.sqrt();
-                    let shadow_ray = Ray::new(pos, light.pos - hit.pos);
-                    if let None = scene.intersect(&shadow_ray) {
-                        color = color + material.color(&shadow_ray, &hit, &scene.camera)
-                            * light.intensity;
+                    let shadow_ray = Ray::new(pos, light.pos - pos);
+                    if scene.intersect(&shadow_ray).is_none() {
+                        color = color + material.color(&shadow_ray, &ray, &hit) * light.intensity;
                     }
                 }
                 let color = Rgb::from_channels(clamp(color.x, 0., 255.) as u8,
