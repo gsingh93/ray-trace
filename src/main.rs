@@ -1,6 +1,8 @@
 extern crate image;
 extern crate nalgebra;
 
+use std::f32;
+
 use image::{ImageBuffer, Rgb, Pixel};
 
 use nalgebra::{clamp, cross, dot, Norm};
@@ -208,7 +210,8 @@ fn main() {
                 // Ambient
                 let mut color = material.color * scene.ambient_coeff;
                 for light in scene.lights.iter() {
-                    let shadow_ray = Ray::new(hit.pos, light.pos - hit.pos);
+                    let pos = hit.pos + hit.normal * f32::EPSILON.sqrt();
+                    let shadow_ray = Ray::new(pos, light.pos - hit.pos);
                     if let None = scene.intersect(&shadow_ray) {
                         // Diffuse
                         color = color + material.color(&shadow_ray, &hit) * light.intensity;
