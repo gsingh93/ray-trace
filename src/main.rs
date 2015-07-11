@@ -3,7 +3,7 @@ extern crate nalgebra;
 
 use image::{ImageBuffer, Rgb, Pixel};
 
-use nalgebra::{cross, dot, Norm};
+use nalgebra::{clamp, cross, dot, Norm};
 
 type Vec3 = nalgebra::Vec3<f32>;
 
@@ -40,7 +40,7 @@ trait Surface {
 }
 
 trait Material {
-    fn color(&self, ray: &Ray, &Intersection) -> (u8, u8, u8);
+    fn color(&self, ray: &Ray, &Intersection) -> Vec3;
 }
 
 #[derive(Clone, Debug)]
@@ -86,23 +86,19 @@ impl Surface for Sphere {
 
 struct DiffuseMaterial {
     intensity: f32,
-    color: (u8, u8, u8),
+    color: Vec3,
 }
 
 impl DiffuseMaterial {
-    fn new(intensity: f32, color: (u8, u8, u8)) -> Self {
+    fn new(intensity: f32, color: Vec3) -> Self {
         DiffuseMaterial { intensity: intensity, color: color }
     }
 }
 
 impl Material for DiffuseMaterial {
-    fn color(&self, ray: &Ray, intersection: &Intersection) -> (u8, u8, u8) {
-        // Note: ray direction has to be flipped
-        let f = f32::max(0., dot(&intersection.normal, &-ray.dir));
-        let f = f * self.intensity;
-        ((self.color.0 as f32 * f) as u8,
-         (self.color.1 as f32 * f) as u8,
-         (self.color.2 as f32 * f) as u8)
+    fn color(&self, ray: &Ray, intersection: &Intersection) -> Vec3 {
+        let f = f32::max(0., dot(&intersection.normal, &ray.dir));
+        self.color * f * self.intensity
     }
 }
 
@@ -120,25 +116,38 @@ struct Camera {
 }
 
 struct PointLight {
+    pos: Vec3,
+    color: Vec3,
     intensity: f32,
 }
 
 impl PointLight {
-    fn new(intensity: f32) -> Self {
-        PointLight { intensity: intensity }
+    fn new(pos: Vec3, color: Vec3, intensity: f32) -> Self {
+        PointLight { pos: pos, color: color, intensity: intensity }
     }
 }
 
 struct Scene {
     objects: Vec<Sphere>,
     lights: Vec<PointLight>,
-    ambient_const: f32,
+    ambient_coeff: f32,
+    ambient_color: Vec3,
     camera: Camera,
 }
 
 impl Scene {
-    fn new(objects: Vec<Sphere>, lights: Vec<PointLight>, ambient: f32, camera: Camera) -> Self {
-        Scene { objects: objects, lights: lights, ambient_const: ambient, camera: camera }
+    fn new(objects: Vec<Sphere>,
+           lights: Vec<PointLight>,
+           ambient_coeff: f32,
+           ambient_color: Vec3,
+           camera: Camera) -> Self {
+        Scene {
+            objects: objects,
+            lights: lights,
+            ambient_coeff: ambient_coeff,
+            ambient_color: ambient_color,
+            camera: camera,
+        }
     }
 
     fn intersect(&self, ray: &Ray) -> Option<(&Sphere, Intersection)> {
@@ -187,17 +196,28 @@ fn main() {
         Camera::from_lookat(pos, lookat, up)
     };
     let sphere = Sphere::new(Vec3::new(0., 0., 0.), 1.);
-    let material = DiffuseMaterial::new(0.7, (0, 0, 255));
-    let light = PointLight::new(1.);
+    let material = DiffuseMaterial::new(0.7, Vec3::new(0., 0., 255.));
+    let light = PointLight::new(Vec3::new(4., 4., 0.), Vec3::new(0., 255., 0.), 2.);
 
-    let scene = Scene::new(vec![sphere], vec![light], 1., camera);
+    let scene = Scene::new(vec![sphere], vec![light], 0.1, Vec3::new(255., 255., 255.), camera);
 
     for x in 0..WIDTH {
         for y in 0..HEIGHT {
             let ray = scene.camera.get_ray(x, y);
             if let Some((_, hit)) = scene.intersect(&ray) {
-                let color = material.color(&ray, &hit);
-                let color = Rgb::from_channels(color.0, color.1, color.2, 255);
+                // Ambient
+                let mut color = material.color * scene.ambient_coeff;
+                for light in scene.lights.iter() {
+                    let shadow_ray = Ray::new(hit.pos, light.pos - hit.pos);
+                    if let None = scene.intersect(&shadow_ray) {
+                        // Diffuse
+                        color = color + material.color(&shadow_ray, &hit) * light.intensity;
+                    }
+                }
+                let color = Rgb::from_channels(clamp(color.x, 0., 255.) as u8,
+                                               clamp(color.y, 0., 255.) as u8,
+                                               clamp(color.z, 0., 255.) as u8,
+                                               255);
                 im.put_pixel(x, y, color);
             }
         }
