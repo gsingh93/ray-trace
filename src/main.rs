@@ -42,7 +42,7 @@ trait Surface {
 }
 
 trait Material {
-    fn color(&self, ray: &Ray, &Intersection) -> Vec3;
+    fn color(&self, ray: &Ray, &Intersection, camera: &Camera) -> Vec3;
 }
 
 #[derive(Clone, Debug)]
@@ -86,21 +86,31 @@ impl Surface for Sphere {
     }
 }
 
-struct DiffuseMaterial {
-    intensity: f32,
+struct SphereMaterial {
     color: Vec3,
+    diffuse_coeff: f32,
+    specular_coeff: f32,
 }
 
-impl DiffuseMaterial {
-    fn new(intensity: f32, color: Vec3) -> Self {
-        DiffuseMaterial { intensity: intensity, color: color }
+impl SphereMaterial {
+    fn new(color: Vec3, diffuse_coeff: f32, specular_coeff: f32) -> Self {
+        SphereMaterial { color: color, diffuse_coeff: diffuse_coeff,
+                         specular_coeff: specular_coeff }
     }
 }
 
-impl Material for DiffuseMaterial {
-    fn color(&self, ray: &Ray, intersection: &Intersection) -> Vec3 {
-        let f = f32::max(0., dot(&intersection.normal, &ray.dir));
-        self.color * f * self.intensity
+impl Material for SphereMaterial {
+    fn color(&self, ray: &Ray, hit: &Intersection, /* TODO: incoming ray */camera: &Camera) -> Vec3 {
+        let f = f32::max(0., dot(&hit.normal, &ray.dir));
+        let diffuse_color = self.color * f * self.diffuse_coeff;
+
+        let camera_dir = camera.pos - hit.pos;
+        let half_vec = ((ray.dir + camera_dir) / 2.).normalize();
+        let f = f32::max(0., dot(&half_vec, &hit.normal)).powi(10); // TODO
+        // TODO
+        let specular_color = Vec3::new(255., 255., 255.) * f * self.specular_coeff;
+
+        diffuse_color + specular_color
     }
 }
 
@@ -198,7 +208,7 @@ fn main() {
         Camera::from_lookat(pos, lookat, up)
     };
     let sphere = Sphere::new(Vec3::new(0., 0., 0.), 1.);
-    let material = DiffuseMaterial::new(0.7, Vec3::new(0., 0., 255.));
+    let material = SphereMaterial::new(Vec3::new(0., 0., 255.), 0.7, 0.);
     let light = PointLight::new(Vec3::new(4., 4., 0.), Vec3::new(0., 255., 0.), 2.);
 
     let scene = Scene::new(vec![sphere], vec![light], 0.1, Vec3::new(255., 255., 255.), camera);
@@ -213,8 +223,8 @@ fn main() {
                     let pos = hit.pos + hit.normal * f32::EPSILON.sqrt();
                     let shadow_ray = Ray::new(pos, light.pos - hit.pos);
                     if let None = scene.intersect(&shadow_ray) {
-                        // Diffuse
-                        color = color + material.color(&shadow_ray, &hit) * light.intensity;
+                        color = color + material.color(&shadow_ray, &hit, &scene.camera)
+                            * light.intensity;
                     }
                 }
                 let color = Rgb::from_channels(clamp(color.x, 0., 255.) as u8,
