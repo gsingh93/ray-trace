@@ -5,11 +5,11 @@ mod surface;
 
 use std::f32;
 
-use surface::{Plane, Sphere, Surface};
+use surface::{Material, Plane, Sphere, SphereMaterial, Surface};
 
 use image::{ImageBuffer, Rgb, Pixel};
 
-use nalgebra::{clamp, cross, dot, Norm};
+use nalgebra::{clamp, cross, Norm};
 
 pub type Vec3 = nalgebra::Vec3<f32>;
 
@@ -42,38 +42,6 @@ impl Intersection {
     }
 }
 
-
-trait Material {
-    fn color(&self, shadow_ray: &Ray, camera_ray: &Ray, &Intersection) -> Vec3;
-}
-
-struct SphereMaterial {
-    color: Vec3,
-    diffuse_coeff: f32,
-    specular_coeff: f32,
-}
-
-impl SphereMaterial {
-    fn new(color: Vec3, diffuse_coeff: f32, specular_coeff: f32) -> Self {
-        SphereMaterial { color: color, diffuse_coeff: diffuse_coeff,
-                         specular_coeff: specular_coeff }
-    }
-}
-
-impl Material for SphereMaterial {
-    fn color(&self, shadow_ray: &Ray, camera_ray: &Ray, hit: &Intersection) -> Vec3 {
-        let f = f32::max(0., dot(&hit.normal, &shadow_ray.dir));
-        let diffuse_color = self.color * f * self.diffuse_coeff;
-
-        let half_vec = ((shadow_ray.dir + camera_ray.dir) / 2.).normalize();
-        let f = f32::max(0., dot(&half_vec, &hit.normal)).powi(10); // TODO
-        // TODO
-        let specular_color = Vec3::new(255., 255., 255.) * f * self.specular_coeff;
-
-        diffuse_color + specular_color
-    }
-}
-
 struct Camera {
     pos: Vec3,
     dir: Vec3,
@@ -93,16 +61,16 @@ impl PointLight {
     }
 }
 
-struct Scene {
-    objects: Vec<Box<Surface>>,
+struct Scene<M> {
+    objects: Vec<Box<Surface<M>>>,
     lights: Vec<PointLight>,
     ambient_coeff: f32,
     ambient_color: Vec3,
     camera: Camera,
 }
 
-impl Scene {
-    fn new(objects: Vec<Box<Surface>>,
+impl<M> Scene<M> {
+    fn new(objects: Vec<Box<Surface<M>>>,
            lights: Vec<PointLight>,
            ambient_coeff: f32,
            ambient_color: Vec3,
@@ -116,7 +84,7 @@ impl Scene {
         }
     }
 
-    fn intersect(&self, ray: &Ray) -> Option<(&Box<Surface>, Intersection)> {
+    fn intersect(&self, ray: &Ray) -> Option<(&Box<Surface<M>>, Intersection)> {
         let mut result = None;
         for obj in self.objects.iter() {
             if let Some(hit) = obj.intersect(ray) {
@@ -154,28 +122,15 @@ impl Camera {
 
 fn main() {
     let mut im: ImageBuffer<Rgb<u8>, _> = ImageBuffer::new(WIDTH, HEIGHT);
-
-    let camera = {
-        let pos = Vec3::new(0., 1., -4.);
-        let lookat = Vec3::new(0., 0., 0.);
-        let up = Vec3::new(0., 1., 0.);
-        Camera::from_lookat(pos, lookat, up)
-    };
-    let plane = Plane::new(Vec3::new(0., 0., 0.), Vec3::new(0., 1., 0.));
-    let sphere = Sphere::new(Vec3::new(0., 0., 0.), 1.);
-    let material = SphereMaterial::new(Vec3::new(0., 0., 255.), 0.7, 0.);
-    let light = PointLight::new(Vec3::new(4., 4., 0.), Vec3::new(0., 255., 0.), 2.);
-
-    let scene = Scene::new(vec![Box::new(sphere), Box::new(plane)],
-                           vec![light],
-                           0.1, Vec3::new(255., 255., 255.), camera);
+    let scene = setup_scene();
 
     for x in 0..WIDTH {
         for y in 0..HEIGHT {
             let ray = scene.camera.get_ray(x, y);
-            if let Some((_, hit)) = scene.intersect(&ray) {
+            if let Some((obj, hit)) = scene.intersect(&ray) {
+                let material = obj.material();
                 // Ambient
-                let mut color = material.color * scene.ambient_coeff;
+                let mut color = material.raw_color() * scene.ambient_coeff;
                 for light in scene.lights.iter() {
                     let pos = hit.pos + hit.normal * f32::EPSILON.sqrt();
                     let shadow_ray = Ray::new(pos, light.pos - pos);
@@ -193,4 +148,24 @@ fn main() {
     }
 
     im.save(OUT_FILE).unwrap();
+}
+
+fn setup_scene() -> Scene<SphereMaterial> {
+    let camera = {
+        let pos = Vec3::new(0., 2., -4.);
+        let lookat = Vec3::new(0., 1., 0.);
+        let up = Vec3::new(0., 1., 0.);
+        Camera::from_lookat(pos, lookat, up)
+    };
+    let plane_material = SphereMaterial::new(Vec3::new(100., 100., 100.), 0.7, 0.);
+    let plane = Plane::new(Vec3::new(0., 0., 0.), Vec3::new(0., 1., 0.), plane_material);
+
+    let sphere_material = SphereMaterial::new(Vec3::new(0., 0., 255.), 0.7, 0.);
+    let sphere = Sphere::new(Vec3::new(0., 1., 0.), 1., sphere_material);
+
+    let light = PointLight::new(Vec3::new(4., 4., 0.), Vec3::new(0., 255., 0.), 2.);
+
+    Scene::new(vec![Box::new(sphere), Box::new(plane)],
+               vec![light],
+               0.1, Vec3::new(255., 255., 255.), camera)
 }

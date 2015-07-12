@@ -2,28 +2,34 @@ use {Intersection, Ray, Vec3};
 
 use nalgebra::{dot, Norm};
 
-pub trait Surface {
+pub trait Surface<M> {
     fn intersect(&self, &Ray) -> Option<Intersection>;
+    fn material(&self) -> &M;
     // For debugging
     fn name(&self) -> &'static str;
 }
 
 #[derive(Clone, Debug)]
-pub struct Sphere {
+pub struct Sphere<M> {
     pos: Vec3,
     radius: f32,
+    material: M,
 }
 
-impl Sphere {
-    pub fn new(pos: Vec3, radius: f32) -> Self {
-        Sphere { pos: pos, radius: radius }
+impl<M: Material> Sphere<M> {
+    pub fn new(pos: Vec3, radius: f32, material: M) -> Self {
+        Sphere { pos: pos, radius: radius, material: material }
     }
 }
 
 
-impl Surface for Sphere {
+impl<M: Material> Surface<M> for Sphere<M> {
     fn name(&self) -> &'static str {
         "Sphere"
+    }
+
+    fn material(&self) -> &M {
+        &self.material
     }
 
     fn intersect(&self, ray: &Ray) -> Option<Intersection> {
@@ -58,20 +64,25 @@ impl Surface for Sphere {
     }
 }
 
-pub struct Plane {
+pub struct Plane<M: Material> {
     point: Vec3,
     normal: Vec3,
+    material: M,
 }
 
-impl Plane {
-    pub fn new(point: Vec3, normal: Vec3) -> Self {
-        Plane { point: point, normal: normal }
+impl<M: Material> Plane<M> {
+    pub fn new(point: Vec3, normal: Vec3, material: M) -> Self {
+        Plane { point: point, normal: normal, material: material }
     }
 }
 
-impl Surface for Plane {
+impl<M: Material> Surface<M> for Plane<M> {
     fn name(&self) -> &'static str {
         "Plane"
+    }
+
+    fn material(&self) -> &M {
+        &self.material
     }
 
     fn intersect(&self, ray: &Ray) -> Option<Intersection> {
@@ -88,11 +99,38 @@ impl Surface for Plane {
     }
 }
 
-#[test]
-fn test() {
-    let plane = Plane::new(Vec3::new(0., 0., 0.), Vec3::new(0., 1., 0.));
-    let sphere = Sphere::new(Vec3::new(0., 0., 0.), 1.);
-    let ray = Ray::new(Vec3::new(4., 4., 0.), Vec3::new(-4., -4., 0.));
-    println!("plane: {:?}", plane.intersect(&ray));
-    println!("sphere: {:?}", sphere.intersect(&ray));
+pub trait Material {
+    fn raw_color(&self) -> Vec3;
+    fn color(&self, shadow_ray: &Ray, camera_ray: &Ray, &Intersection) -> Vec3;
+}
+
+pub struct SphereMaterial {
+    color: Vec3,
+    diffuse_coeff: f32,
+    specular_coeff: f32,
+}
+
+impl SphereMaterial {
+    pub fn new(color: Vec3, diffuse_coeff: f32, specular_coeff: f32) -> Self {
+        SphereMaterial { color: color, diffuse_coeff: diffuse_coeff,
+                         specular_coeff: specular_coeff }
+    }
+}
+
+impl Material for SphereMaterial {
+    fn raw_color(&self) -> Vec3 {
+        self.color
+    }
+
+    fn color(&self, shadow_ray: &Ray, camera_ray: &Ray, hit: &Intersection) -> Vec3 {
+        let f = f32::max(0., dot(&hit.normal, &shadow_ray.dir));
+        let diffuse_color = self.color * f * self.diffuse_coeff;
+
+        let half_vec = ((shadow_ray.dir + camera_ray.dir) / 2.).normalize();
+        let f = f32::max(0., dot(&half_vec, &hit.normal)).powi(10); // TODO
+        // TODO
+        let specular_color = Vec3::new(255., 255., 255.) * f * self.specular_coeff;
+
+        diffuse_color + specular_color
+    }
 }
