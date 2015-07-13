@@ -9,13 +9,15 @@ use surface::{Material, Plane, Sphere, SphereMaterial, Surface};
 
 use image::{ImageBuffer, Rgb, Pixel};
 
-use nalgebra::{clamp, cross, Norm};
+use nalgebra::{clamp, cross, dot, Norm};
 
 pub type Vec3 = nalgebra::Vec3<f32>;
 
 const OUT_FILE: &'static str = "image.png";
 const WIDTH: u32 = 640;
 const HEIGHT: u32 = 480;
+
+const MAX_DEPTH: u16 = 1;
 
 #[derive(Debug)]
 pub struct Ray {
@@ -127,27 +129,56 @@ fn main() {
     for x in 0..WIDTH {
         for y in 0..HEIGHT {
             let ray = scene.camera.get_ray(x, y);
-            if let Some((obj, hit)) = scene.intersect(&ray) {
-                let material = obj.material();
-                // Ambient
-                let mut color = material.raw_color() * scene.ambient_coeff;
-                for light in scene.lights.iter() {
-                    let pos = hit.pos + hit.normal * f32::EPSILON.sqrt();
-                    let shadow_ray = Ray::new(pos, light.pos - pos);
-                    if scene.intersect(&shadow_ray).is_none() {
-                        color = color + material.color(&shadow_ray, &ray, &hit) * light.intensity;
-                    }
-                }
-                let color = Rgb::from_channels(clamp(color.x, 0., 255.) as u8,
-                                               clamp(color.y, 0., 255.) as u8,
-                                               clamp(color.z, 0., 255.) as u8,
-                                               255);
-                im.put_pixel(x, y, color);
-            }
+            let color = trace_ray(&scene, &ray, 0);
+
+            let color = Rgb::from_channels(clamp(color.x, 0., 255.) as u8,
+                                           clamp(color.y, 0., 255.) as u8,
+                                           clamp(color.z, 0., 255.) as u8,
+                                           255);
+            im.put_pixel(x, y, color);
         }
     }
 
     im.save(OUT_FILE).unwrap();
+}
+
+fn trace_ray(scene: &Scene<SphereMaterial>, ray: &Ray, depth: u16) -> Vec3 {
+    let mut color = Vec3::new(0., 0., 0.); // TODO: Background color
+    if let Some((obj, hit)) = scene.intersect(ray) {
+        let material = obj.material();
+
+        // Ambient color
+        color = material.raw_color() * scene.ambient_coeff;
+
+        // Trace shadow rays
+        for light in scene.lights.iter() {
+            let pos = hit.pos + hit.normal * f32::EPSILON.sqrt();
+            let shadow_ray = Ray::new(pos, light.pos - pos);
+            if scene.intersect(&shadow_ray).is_none() {
+                // Diffuse/specular color
+                color = color + material.color(&shadow_ray, &ray, &hit) * light.intensity;
+            }
+        }
+
+        if depth >= MAX_DEPTH {
+            return color;
+        }
+
+        // Get reflected color
+        let reflectivity = material.reflectivity();
+        if reflectivity > 0. {
+            let reflected_ray = reflected_ray(ray, &hit);
+            let reflected_color = trace_ray(scene, &reflected_ray, depth + 1);
+            color = color + reflected_color * reflectivity;
+        }
+    }
+    color
+}
+
+fn reflected_ray(ray: &Ray, hit: &Intersection) -> Ray {
+    let pos = hit.pos + hit.normal * f32::EPSILON.sqrt();
+    let dir = ray.dir - hit.normal * 2. * dot(&ray.dir, &hit.normal);
+    Ray::new(pos, dir)
 }
 
 fn setup_scene() -> Scene<SphereMaterial> {
@@ -157,10 +188,10 @@ fn setup_scene() -> Scene<SphereMaterial> {
         let up = Vec3::new(0., 1., 0.);
         Camera::from_lookat(pos, lookat, up)
     };
-    let plane_material = SphereMaterial::new(Vec3::new(100., 100., 100.), 0.7, 0., 0.);
+    let plane_material = SphereMaterial::new(Vec3::new(100., 100., 100.), 0.7, 0., 0., 1.);
     let plane = Plane::new(Vec3::new(0., 0., 0.), Vec3::new(0., 1., 0.), plane_material);
 
-    let sphere_material = SphereMaterial::new(Vec3::new(0., 0., 255.), 0.3, 0.2, 20.);
+    let sphere_material = SphereMaterial::new(Vec3::new(0., 0., 255.), 0.3, 0.2, 20., 0.);
     let sphere = Sphere::new(Vec3::new(0., 1., 0.), 1., sphere_material);
 
     let light = PointLight::new(Vec3::new(3., 3., -4.), Vec3::new(0., 255., 0.), 2.);

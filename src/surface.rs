@@ -100,6 +100,7 @@ impl<M: Material> Surface<M> for Plane<M> {
 }
 
 pub trait Material {
+    fn reflectivity(&self) -> f32;
     fn raw_color(&self) -> Vec3;
     fn color(&self, shadow_ray: &Ray, camera_ray: &Ray, &Intersection) -> Vec3;
 }
@@ -109,16 +110,23 @@ pub struct SphereMaterial {
     diffuse_coeff: f32,
     specular_coeff: f32,
     glossiness: f32,
+    reflectivity: f32,
 }
 
 impl SphereMaterial {
-    pub fn new(color: Vec3, diffuse_coeff: f32, specular_coeff: f32, glossiness: f32) -> Self {
+    pub fn new(color: Vec3, diffuse_coeff: f32, specular_coeff: f32, glossiness: f32,
+               reflectivity: f32) -> Self {
         SphereMaterial { color: color, diffuse_coeff: diffuse_coeff,
-                         specular_coeff: specular_coeff, glossiness: glossiness }
+                         specular_coeff: specular_coeff, glossiness: glossiness,
+                         reflectivity: reflectivity }
     }
 }
 
 impl Material for SphereMaterial {
+    fn reflectivity(&self) -> f32 {
+        self.reflectivity
+    }
+
     fn raw_color(&self) -> Vec3 {
         self.color
     }
