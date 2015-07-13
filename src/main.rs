@@ -152,18 +152,18 @@ fn main() {
 
 fn setup_scene() -> Scene<SphereMaterial> {
     let camera = {
-        let pos = Vec3::new(0., 2., -4.);
+        let pos = Vec3::new(0., 2., -5.);
         let lookat = Vec3::new(0., 1., 0.);
         let up = Vec3::new(0., 1., 0.);
         Camera::from_lookat(pos, lookat, up)
     };
-    let plane_material = SphereMaterial::new(Vec3::new(100., 100., 100.), 0.7, 0.);
+    let plane_material = SphereMaterial::new(Vec3::new(100., 100., 100.), 0.7, 0., 0.);
     let plane = Plane::new(Vec3::new(0., 0., 0.), Vec3::new(0., 1., 0.), plane_material);
 
-    let sphere_material = SphereMaterial::new(Vec3::new(0., 0., 255.), 0.7, 0.);
+    let sphere_material = SphereMaterial::new(Vec3::new(0., 0., 255.), 0.3, 0.2, 20.);
     let sphere = Sphere::new(Vec3::new(0., 1., 0.), 1., sphere_material);
 
-    let light = PointLight::new(Vec3::new(4., 4., 0.), Vec3::new(0., 255., 0.), 2.);
+    let light = PointLight::new(Vec3::new(3., 3., -4.), Vec3::new(0., 255., 0.), 2.);
 
     Scene::new(vec![Box::new(sphere), Box::new(plane)],
                vec![light],

@@ -108,12 +108,13 @@ pub struct SphereMaterial {
     color: Vec3,
     diffuse_coeff: f32,
     specular_coeff: f32,
+    glossiness: f32,
 }
 
 impl SphereMaterial {
-    pub fn new(color: Vec3, diffuse_coeff: f32, specular_coeff: f32) -> Self {
+    pub fn new(color: Vec3, diffuse_coeff: f32, specular_coeff: f32, glossiness: f32) -> Self {
         SphereMaterial { color: color, diffuse_coeff: diffuse_coeff,
-                         specular_coeff: specular_coeff }
+                         specular_coeff: specular_coeff, glossiness: glossiness }
     }
 }
 
@@ -126,9 +127,10 @@ impl Material for SphereMaterial {
         let f = f32::max(0., dot(&hit.normal, &shadow_ray.dir));
         let diffuse_color = self.color * f * self.diffuse_coeff;
 
-        let half_vec = ((shadow_ray.dir + camera_ray.dir) / 2.).normalize();
-        let f = f32::max(0., dot(&half_vec, &hit.normal)).powi(10); // TODO
-        // TODO
+        // Average the angles, flipping the camera ray because it's in the opposite direction
+        let half_vec = ((shadow_ray.dir - camera_ray.dir) / 2.).normalize();
+        let f = f32::max(0., dot(&half_vec, &hit.normal)).powf(self.glossiness);
+        // TODO: Specular default color
         let specular_color = Vec3::new(255., 255., 255.) * f * self.specular_coeff;
 
         diffuse_color + specular_color
