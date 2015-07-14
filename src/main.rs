@@ -4,10 +4,11 @@ extern crate nalgebra;
 mod surface;
 
 use std::f32;
+use std::fs::File;
 
 use surface::{Material, Plane, Sphere, SphereMaterial, Surface};
 
-use image::{ImageBuffer, Rgb, Pixel};
+use image::{DynamicImage, ImageBuffer, ImageFormat, FilterType, Rgb, Pixel};
 
 use nalgebra::{clamp, cross, dot, Norm};
 
@@ -18,6 +19,10 @@ const WIDTH: u32 = 640;
 const HEIGHT: u32 = 480;
 
 const MAX_DEPTH: u16 = 1;
+
+const SUPER_SAMPLING: u32 = 1;
+const RENDER_WIDTH: u32 = SUPER_SAMPLING * WIDTH;
+const RENDER_HEIGHT: u32 = SUPER_SAMPLING * HEIGHT;
 
 #[derive(Debug)]
 pub struct Ray {
@@ -114,8 +119,8 @@ impl Camera {
     }
 
     fn get_ray(&self, x: u32, y: u32) -> Ray {
-        let norm_x = (x as f32 / WIDTH as f32) - 0.5;
-        let norm_y = (y as f32 / HEIGHT as f32) - 0.5;
+        let norm_x = (x as f32 / RENDER_WIDTH as f32) - 0.5;
+        let norm_y = (y as f32 / RENDER_HEIGHT as f32) - 0.5;
 
         let dir = self.right * norm_x + self.up * norm_y + self.dir;
         Ray::new(self.pos, dir)
@@ -123,11 +128,11 @@ impl Camera {
 }
 
 fn main() {
-    let mut im: ImageBuffer<Rgb<u8>, _> = ImageBuffer::new(WIDTH, HEIGHT);
+    let mut im: ImageBuffer<Rgb<u8>, _> = ImageBuffer::new(RENDER_WIDTH, RENDER_HEIGHT);
     let scene = setup_scene();
 
-    for x in 0..WIDTH {
-        for y in 0..HEIGHT {
+    for x in 0..RENDER_WIDTH {
+        for y in 0..RENDER_HEIGHT {
             let ray = scene.camera.get_ray(x, y);
             let color = trace_ray(&scene, &ray, 0);
 
@@ -139,7 +144,9 @@ fn main() {
         }
     }
 
-    im.save(OUT_FILE).unwrap();
+    let im = DynamicImage::ImageRgb8(im).resize_exact(WIDTH, HEIGHT, FilterType::Triangle);
+    let mut f = File::create(OUT_FILE).unwrap();
+    im.save(&mut f, ImageFormat::PNG).unwrap();
 }
 
 fn trace_ray(scene: &Scene<SphereMaterial>, ray: &Ray, depth: u16) -> Vec3 {
