@@ -2,33 +2,31 @@ use {Intersection, Ray, Vec3};
 
 use nalgebra::{dot, Norm};
 
-pub trait Surface<M> {
+pub trait Surface {
     fn intersect(&self, &Ray) -> Option<Intersection>;
-    fn material(&self) -> &M;
+    fn material(&self) -> &Material;
     // For debugging
     fn name(&self) -> &'static str;
 }
 
-#[derive(Clone, Debug)]
-pub struct Sphere<M> {
+pub struct Sphere {
     pos: Vec3,
     radius: f32,
-    material: M,
+    material: Material,
 }
 
-impl<M: Material> Sphere<M> {
-    pub fn new(pos: Vec3, radius: f32, material: M) -> Self {
+impl Sphere {
+    pub fn new(pos: Vec3, radius: f32, material: Material) -> Self {
         Sphere { pos: pos, radius: radius, material: material }
     }
 }
 
-
-impl<M: Material> Surface<M> for Sphere<M> {
+impl Surface for Sphere {
     fn name(&self) -> &'static str {
         "Sphere"
     }
 
-    fn material(&self) -> &M {
+    fn material(&self) -> &Material {
         &self.material
     }
 
@@ -64,24 +62,24 @@ impl<M: Material> Surface<M> for Sphere<M> {
     }
 }
 
-pub struct Plane<M: Material> {
+pub struct Plane {
     point: Vec3,
     normal: Vec3,
-    material: M,
+    material: Material,
 }
 
-impl<M: Material> Plane<M> {
-    pub fn new(point: Vec3, normal: Vec3, material: M) -> Self {
+impl Plane {
+    pub fn new(point: Vec3, normal: Vec3, material: Material) -> Self {
         Plane { point: point, normal: normal, material: material }
     }
 }
 
-impl<M: Material> Surface<M> for Plane<M> {
+impl Surface for Plane {
     fn name(&self) -> &'static str {
         "Plane"
     }
 
-    fn material(&self) -> &M {
+    fn material(&self) -> &Material {
         &self.material
     }
 
@@ -99,13 +97,7 @@ impl<M: Material> Surface<M> for Plane<M> {
     }
 }
 
-pub trait Material {
-    fn reflectivity(&self) -> f32;
-    fn raw_color(&self) -> Vec3;
-    fn color(&self, shadow_ray: &Ray, camera_ray: &Ray, &Intersection) -> Vec3;
-}
-
-pub struct SphereMaterial {
+pub struct Material {
     color: Vec3,
     diffuse_coeff: f32,
     specular_coeff: f32,
@@ -113,25 +105,23 @@ pub struct SphereMaterial {
     reflectivity: f32,
 }
 
-impl SphereMaterial {
+impl Material {
     pub fn new(color: Vec3, diffuse_coeff: f32, specular_coeff: f32, glossiness: f32,
                reflectivity: f32) -> Self {
-        SphereMaterial { color: color, diffuse_coeff: diffuse_coeff,
+        Material { color: color, diffuse_coeff: diffuse_coeff,
                          specular_coeff: specular_coeff, glossiness: glossiness,
                          reflectivity: reflectivity }
     }
-}
 
-impl Material for SphereMaterial {
-    fn reflectivity(&self) -> f32 {
+    pub fn reflectivity(&self) -> f32 {
         self.reflectivity
     }
 
-    fn raw_color(&self) -> Vec3 {
+    pub fn raw_color(&self) -> Vec3 {
         self.color
     }
 
-    fn color(&self, shadow_ray: &Ray, camera_ray: &Ray, hit: &Intersection) -> Vec3 {
+    pub fn color(&self, shadow_ray: &Ray, camera_ray: &Ray, hit: &Intersection) -> Vec3 {
         let f = f32::max(0., dot(&hit.normal, &shadow_ray.dir));
         let diffuse_color = self.color * f * self.diffuse_coeff;
 

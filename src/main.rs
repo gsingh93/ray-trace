@@ -6,7 +6,7 @@ mod surface;
 use std::f32;
 use std::fs::File;
 
-use surface::{Material, Plane, Sphere, SphereMaterial, Surface};
+use surface::{Material, Plane, Sphere, Surface};
 
 use image::{DynamicImage, ImageBuffer, ImageFormat, FilterType, Rgb, Pixel};
 
@@ -68,16 +68,16 @@ impl PointLight {
     }
 }
 
-struct Scene<M> {
-    objects: Vec<Box<Surface<M>>>,
+struct Scene {
+    objects: Vec<Box<Surface>>,
     lights: Vec<PointLight>,
     ambient_coeff: f32,
     ambient_color: Vec3,
     camera: Camera,
 }
 
-impl<M> Scene<M> {
-    fn new(objects: Vec<Box<Surface<M>>>,
+impl Scene {
+    fn new(objects: Vec<Box<Surface>>,
            lights: Vec<PointLight>,
            ambient_coeff: f32,
            ambient_color: Vec3,
@@ -91,7 +91,7 @@ impl<M> Scene<M> {
         }
     }
 
-    fn intersect(&self, ray: &Ray) -> Option<(&Box<Surface<M>>, Intersection)> {
+    fn intersect(&self, ray: &Ray) -> Option<(&Box<Surface>, Intersection)> {
         let mut result = None;
         for obj in self.objects.iter() {
             if let Some(hit) = obj.intersect(ray) {
@@ -149,7 +149,7 @@ fn main() {
     im.save(&mut f, ImageFormat::PNG).unwrap();
 }
 
-fn trace_ray(scene: &Scene<SphereMaterial>, ray: &Ray, depth: u16) -> Vec3 {
+fn trace_ray(scene: &Scene, ray: &Ray, depth: u16) -> Vec3 {
     let mut color = Vec3::new(0., 0., 0.); // TODO: Background color
     if let Some((obj, hit)) = scene.intersect(ray) {
         let material = obj.material();
@@ -188,17 +188,17 @@ fn reflected_ray(ray: &Ray, hit: &Intersection) -> Ray {
     Ray::new(pos, dir)
 }
 
-fn setup_scene() -> Scene<SphereMaterial> {
+fn setup_scene() -> Scene {
     let camera = {
         let pos = Vec3::new(0., 2., -5.);
         let lookat = Vec3::new(0., 1., 0.);
         let up = Vec3::new(0., 1., 0.);
         Camera::from_lookat(pos, lookat, up)
     };
-    let plane_material = SphereMaterial::new(Vec3::new(100., 100., 100.), 0.7, 0., 0., 1.);
+    let plane_material = Material::new(Vec3::new(100., 100., 100.), 0.7, 0., 0., 1.);
     let plane = Plane::new(Vec3::new(0., 0., 0.), Vec3::new(0., 1., 0.), plane_material);
 
-    let sphere_material = SphereMaterial::new(Vec3::new(0., 0., 255.), 0.3, 0.2, 20., 0.);
+    let sphere_material = Material::new(Vec3::new(0., 0., 255.), 0.3, 0.2, 20., 0.);
     let sphere = Sphere::new(Vec3::new(0., 1., 0.), 1., sphere_material);
 
     let light = PointLight::new(Vec3::new(3., 3., -4.), Vec3::new(0., 255., 0.), 2.);
