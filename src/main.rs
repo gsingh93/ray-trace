@@ -5,7 +5,7 @@ mod surface;
 
 use std::f32;
 
-use surface::{Material, Plane, Sphere, Surface};
+use surface::{CheckerboardTexture, Material, Plane, Sphere, Surface, Texture};
 
 use image::{ImageBuffer, FilterType, Rgb, Pixel};
 use image::imageops::resize;
@@ -42,11 +42,13 @@ pub struct Intersection {
     pos: Vec3,
     normal: Vec3,
     dist: f32,
+    u: f32,
+    v: f32,
 }
 
 impl Intersection {
-    fn new(pos: Vec3, normal: Vec3, dist: f32) -> Self {
-        Intersection { pos: pos, normal: normal, dist: dist }
+    fn new(pos: Vec3, normal: Vec3, dist: f32, u: f32, v: f32) -> Self {
+        Intersection { pos: pos, normal: normal, dist: dist, u: u, v: v }
     }
 }
 
@@ -196,10 +198,11 @@ fn setup_scene() -> Scene {
         let up = Vec3::new(0., 1., 0.);
         Camera::from_lookat(pos, lookat, up)
     };
-    let plane_material = Material::new(Vec3::new(100., 100., 100.), 0.7, 0., 0., 1.);
-    let plane = Plane::new(Vec3::new(0., 0., 0.), Vec3::new(0., 1., 0.), plane_material);
+    let checkerboard: Option<Box<Texture>> = Some(Box::new(CheckerboardTexture { dim: 1. }));
+    let plane_material = Material::new(Vec3::new(100., 100., 100.), 0.7, 0., 0., 1., checkerboard);
+    let plane = Plane::new(Vec3::new(1., 0., 1.), Vec3::new(0., 1., 0.), plane_material);
 
-    let sphere_material = Material::new(Vec3::new(0., 0., 255.), 0.3, 0.2, 20., 0.);
+    let sphere_material = Material::new(Vec3::new(0., 0., 255.), 0.3, 0.2, 20., 0., None);
     let sphere = Sphere::new(Vec3::new(0., 1., 0.), 1., sphere_material);
 
     let light = PointLight::new(Vec3::new(3., 3., -4.), Vec3::new(0., 255., 0.), 2.);
