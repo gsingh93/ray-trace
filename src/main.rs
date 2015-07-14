@@ -4,11 +4,11 @@ extern crate nalgebra;
 mod surface;
 
 use std::f32;
-use std::fs::File;
 
 use surface::{Material, Plane, Sphere, Surface};
 
-use image::{DynamicImage, ImageBuffer, ImageFormat, FilterType, Rgb, Pixel};
+use image::{ImageBuffer, FilterType, Rgb, Pixel};
+use image::imageops::resize;
 
 use nalgebra::{clamp, cross, dot, Norm};
 
@@ -146,9 +146,8 @@ fn main() {
         }
     }
 
-    let im = DynamicImage::ImageRgb8(im).resize_exact(WIDTH, HEIGHT, FilterType::Triangle);
-    let mut f = File::create(OUT_FILE).unwrap();
-    im.save(&mut f, ImageFormat::PNG).unwrap();
+    let im = resize(&im, WIDTH, HEIGHT, FilterType::Triangle);
+    im.save(OUT_FILE).unwrap();
 }
 
 fn trace_ray(scene: &Scene, ray: &Ray, depth: u16) -> Vec3 {
