@@ -1,11 +1,15 @@
 extern crate image;
 extern crate nalgebra;
 
+mod material;
 mod surface;
+mod texture;
 
 use std::f32;
 
-use surface::{CheckerboardTexture, Material, Plane, Sphere, Surface, Texture};
+use material::Material;
+use surface::{Plane, Sphere, Surface};
+use texture::{CheckerboardTexture, Texture};
 
 use image::{ImageBuffer, FilterType, Rgb, Pixel};
 use image::imageops::resize;
