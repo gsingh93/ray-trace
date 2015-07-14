@@ -23,6 +23,7 @@ const MAX_DEPTH: u16 = 1;
 const SUPER_SAMPLING: u32 = 1;
 const RENDER_WIDTH: u32 = SUPER_SAMPLING * WIDTH;
 const RENDER_HEIGHT: u32 = SUPER_SAMPLING * HEIGHT;
+const ASPECT_RATIO: f32 = WIDTH as f32 / HEIGHT as f32;
 
 #[derive(Debug)]
 pub struct Ray {
@@ -121,6 +122,7 @@ impl Camera {
     fn get_ray(&self, x: u32, y: u32) -> Ray {
         let norm_x = (x as f32 / RENDER_WIDTH as f32) - 0.5;
         let norm_y = (y as f32 / RENDER_HEIGHT as f32) - 0.5;
+        let norm_x = norm_x * ASPECT_RATIO;
 
         let dir = self.right * norm_x + self.up * norm_y + self.dir;
         Ray::new(self.pos, dir)
