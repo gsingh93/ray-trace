@@ -8,6 +8,7 @@ pub mod texture;
 
 use std::f32;
 
+use light::PointLight;
 pub use material::Material;
 use surface::Surface;
 use texture::Texture;
@@ -45,6 +46,7 @@ impl Intersection {
     }
 }
 
+#[derive(Debug)]
 pub struct Camera {
     pos: Vec3,
     dir: Vec3,
@@ -142,10 +144,10 @@ fn trace_ray(scene: &Scene, ray: &Ray, depth: u16, max_depth: u16) -> Vec3 {
         // Trace shadow rays
         for light in scene.lights.iter() {
             let pos = hit.pos + hit.normal * f32::EPSILON.sqrt();
-            let shadow_ray = Ray::new(pos, light.pos - pos);
+            let shadow_ray = Ray::new(pos, *light.pos() - pos);
             if scene.intersect(&shadow_ray).is_none() {
                 // Diffuse/specular color
-                color = color + material.color(&shadow_ray, &ray, &hit) * light.intensity;
+                color = color + material.color(&shadow_ray, &ray, &hit) * light.intensity();
             }
         }
 

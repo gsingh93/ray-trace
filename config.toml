@@ -1,4 +1,5 @@
 [config]
+scene = "sphere.toml"
 width = 640
 height = 480
 samples = 1

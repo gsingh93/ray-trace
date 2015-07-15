@@ -14,6 +14,19 @@ pub struct Material {
     texture: Option<Box<Texture>>,
 }
 
+impl Clone for Material {
+    fn clone(&self) -> Material {
+        Material {
+            color: self.color,
+            diffuse_coeff: self.diffuse_coeff,
+            specular_coeff: self.specular_coeff,
+            glossiness: self.glossiness,
+            reflectivity: self.reflectivity,
+            texture: self.texture.as_ref().map(|t| t.clone_()),
+        }
+    }
+}
+
 impl Material {
     pub fn new(color: Vec3, diffuse_coeff: f32, specular_coeff: f32, glossiness: f32,
                reflectivity: f32, texture: Option<Box<Texture>>) -> Self {
@@ -36,7 +49,6 @@ impl Material {
             Some(ref t) => t.color(hit.u, hit.v) / 255.,
             None => Vec3::new(1., 1., 1.)
         };
-
 
         // Average the angles, flipping the camera ray because it's in the opposite direction
         let half_vec = ((shadow_ray.dir - camera_ray.dir) / 2.).normalize();

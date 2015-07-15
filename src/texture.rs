@@ -4,8 +4,10 @@ use image::{self, ImageRgb8, RgbImage};
 
 pub trait Texture {
     fn color(&self, u: f32, v: f32) -> Vec3;
+    fn clone_(&self) -> Box<Texture>;
 }
 
+#[derive(Clone)]
 pub struct CheckerboardTexture {
     pub dim: f32,
 }
@@ -43,8 +45,13 @@ impl Texture for CheckerboardTexture {
             color2
         }
     }
+
+    fn clone_(&self) -> Box<Texture> {
+        Box::new(self.clone())
+    }
 }
 
+#[derive(Clone)]
 pub struct ImageTexture {
     image: RgbImage,
 }
@@ -68,5 +75,9 @@ impl Texture for ImageTexture {
         // TODO: Bilinear sampling
         let p = self.image.get_pixel(u as u32, v as u32);
         Vec3::new(p.data[0] as f32, p.data[1] as f32, p.data[2] as f32)
+    }
+
+    fn clone_(&self) -> Box<Texture> {
+        Box::new(self.clone())
     }
 }

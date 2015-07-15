@@ -1,0 +1,43 @@
+[[material]]
+name = "plane_material"
+color = [100, 100, 100]
+diffuse = 0.7
+specular = 0.0
+glossiness = 0.0
+reflectivity = 1.0
+checkerboard = 1.0
+
+[[material]]
+name = "sphere_material"
+color = [0, 0, 255]
+diffuse = 0.3
+specular = 0.2
+glossiness = 20.0
+reflectivity = 0.0
+
+[scene]
+ambient_const = 0.1
+ambient_color = [255, 255, 255]
+
+[scene.camera]
+pos = [0.0, 2.0, -5.0]
+lookat = [0.0, 1.0, 0.0]
+up = [0.0, 1.0, 0.0]
+
+[[scene.surface]]
+type = "sphere"
+material = "sphere_material"
+pos = [0.0, 1.0, 0.0]
+radius = 1.0
+
+[[scene.surface]]
+type = "plane"
+material = "plane_material"
+pos = [1.0, 0.0, 1.0]
+normal = [0.0, 1.0, 0.0]
+
+[[scene.light]]
+type = "point"
+pos = [3.0, 3.0, -4.0]
+color = [0, 255, 0]
+intensity = 2.0
