@@ -3,6 +3,7 @@ extern crate nalgebra;
 
 pub mod light;
 pub mod material;
+mod ray;
 pub mod surface;
 pub mod texture;
 
@@ -10,6 +11,7 @@ use std::f32;
 
 use light::PointLight;
 pub use material::Material;
+use ray::{Intersection, Ray};
 use surface::Surface;
 use texture::Texture;
 
@@ -18,33 +20,6 @@ use image::{RgbImage, Rgb, Pixel};
 use nalgebra::{clamp, cross, dot, Norm};
 
 pub type Vec3 = nalgebra::Vec3<f32>;
-
-#[derive(Debug)]
-pub struct Ray {
-    origin: Vec3,
-    dir: Vec3,
-}
-
-impl Ray {
-    fn new(origin: Vec3, dir: Vec3) -> Self {
-        Ray { origin: origin, dir: dir.normalize() }
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct Intersection {
-    pos: Vec3,
-    normal: Vec3,
-    dist: f32,
-    u: f32,
-    v: f32,
-}
-
-impl Intersection {
-    fn new(pos: Vec3, normal: Vec3, dist: f32, u: f32, v: f32) -> Self {
-        Intersection { pos: pos, normal: normal, dist: dist, u: u, v: v }
-    }
-}
 
 #[derive(Debug)]
 pub struct Camera {

@@ -1,7 +1,8 @@
 use std::f32;
 
-use {Intersection, Ray, Vec3};
+use Vec3;
 use texture::Texture;
+use ray::{Intersection, Ray};
 
 use nalgebra::{dot, Norm};
 
