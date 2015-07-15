@@ -9,7 +9,7 @@ use std::f32;
 
 use material::Material;
 use surface::{Plane, Sphere, Surface};
-use texture::{CheckerboardTexture, Texture};
+use texture::{CheckerboardTexture, ImageTexture, Texture};
 
 use image::{ImageBuffer, FilterType, Rgb, Pixel};
 use image::imageops::resize;
@@ -202,11 +202,12 @@ fn setup_scene() -> Scene {
         let up = Vec3::new(0., 1., 0.);
         Camera::from_lookat(pos, lookat, up)
     };
-    let checkerboard: Option<Box<Texture>> = Some(Box::new(CheckerboardTexture { dim: 1. }));
-    let plane_material = Material::new(Vec3::new(100., 100., 100.), 0.7, 0., 0., 1., checkerboard);
+    let checkerboard: Box<Texture> = Box::new(CheckerboardTexture::new(1.));
+    let plane_material = Material::new(Vec3::new(100., 100., 100.), 0.7, 0., 0., 1.,
+                                       Some(checkerboard));
     let plane = Plane::new(Vec3::new(1., 0., 1.), Vec3::new(0., 1., 0.), plane_material);
 
-    let sphere_material = Material::new(Vec3::new(0., 0., 255.), 0.3, 0.2, 20., 0., None);
+    let sphere_material = Material::new(Vec3::new(208.,127.,64.), 0.3, 0.2, 20., 0., None);
     let sphere = Sphere::new(Vec3::new(0., 1., 0.), 1., sphere_material);
 
     let light = PointLight::new(Vec3::new(3., 3., -4.), Vec3::new(0., 255., 0.), 2.);
