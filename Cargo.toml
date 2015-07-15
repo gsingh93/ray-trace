@@ -3,6 +3,15 @@ name = "ray-tracer"
 version = "0.1.0"
 authors = ["Gulshan Singh <gsingh2011@gmail.com>"]
 
+[lib]
+name = "tracerlib"
+path = "src/lib.rs"
+
+[[bin]]
+name = "ray-tracer"
+path = "src/main.rs"
+
 [dependencies]
 image = "*"
 nalgebra = "*"
+toml = "*"

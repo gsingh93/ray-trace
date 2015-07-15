@@ -1,0 +1,171 @@
+extern crate image;
+extern crate nalgebra;
+
+pub mod light;
+pub mod material;
+pub mod surface;
+pub mod texture;
+
+use std::f32;
+
+pub use material::Material;
+use surface::Surface;
+use texture::Texture;
+
+use image::{RgbImage, Rgb, Pixel};
+
+use nalgebra::{clamp, cross, dot, Norm};
+
+pub type Vec3 = nalgebra::Vec3<f32>;
+
+#[derive(Debug)]
+pub struct Ray {
+    origin: Vec3,
+    dir: Vec3,
+}
+
+impl Ray {
+    fn new(origin: Vec3, dir: Vec3) -> Self {
+        Ray { origin: origin, dir: dir.normalize() }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Intersection {
+    pos: Vec3,
+    normal: Vec3,
+    dist: f32,
+    u: f32,
+    v: f32,
+}
+
+impl Intersection {
+    fn new(pos: Vec3, normal: Vec3, dist: f32, u: f32, v: f32) -> Self {
+        Intersection { pos: pos, normal: normal, dist: dist, u: u, v: v }
+    }
+}
+
+pub struct Camera {
+    pos: Vec3,
+    dir: Vec3,
+    up: Vec3,
+    right: Vec3,
+}
+
+impl Camera {
+    pub fn new(pos: Vec3, dir: Vec3, up: Vec3) -> Self {
+        let right = cross(&up, &dir).normalize();
+        let up = cross(&right, &dir).normalize();
+        Camera { pos: pos, dir: dir.normalize(), up: up, right: right }
+    }
+
+    pub fn from_lookat(pos: Vec3, lookat: Vec3, up: Vec3) -> Self {
+        let dir = lookat - pos;
+        Camera::new(pos, dir, up)
+    }
+
+    fn get_ray(&self, x: u32, y: u32, width: u32, height: u32, aspect_ratio: f32) -> Ray {
+        let norm_x = (x as f32 / width as f32) - 0.5;
+        let norm_y = (y as f32 / height as f32) - 0.5;
+        let norm_x = norm_x * aspect_ratio;
+
+        let dir = self.right * norm_x + self.up * norm_y + self.dir;
+        Ray::new(self.pos, dir)
+    }
+}
+
+pub struct Scene {
+    objects: Vec<Box<Surface>>,
+    lights: Vec<PointLight>,
+    ambient_coeff: f32,
+    ambient_color: Vec3,
+    camera: Camera,
+}
+
+impl Scene {
+    pub fn new(objects: Vec<Box<Surface>>,
+           lights: Vec<PointLight>,
+           ambient_coeff: f32,
+           ambient_color: Vec3,
+           camera: Camera) -> Self {
+        Scene {
+            objects: objects,
+            lights: lights,
+            ambient_coeff: ambient_coeff,
+            ambient_color: ambient_color,
+            camera: camera,
+        }
+    }
+
+    fn intersect(&self, ray: &Ray) -> Option<(&Box<Surface>, Intersection)> {
+        let mut result = None;
+        for obj in self.objects.iter() {
+            if let Some(hit) = obj.intersect(ray) {
+                match result.clone() {
+                    None => result = Some((obj, hit)),
+                    Some((_, ref old_hit)) =>
+                        if hit.dist < old_hit.dist { result = Some((obj, hit)) }
+                }
+            }
+        }
+        result
+    }
+}
+
+pub fn ray_trace(scene: &Scene, width: u32, height: u32, max_depth: u16) -> RgbImage {
+    let aspect_ratio = width as f32 / height as f32;
+
+    let mut im: RgbImage = RgbImage::new(width, height);
+    for x in 0..width {
+        for y in 0..height {
+            let ray = scene.camera.get_ray(x, y, width, height, aspect_ratio);
+            let color = trace_ray(&scene, &ray, 0, max_depth);
+
+            let color = Rgb::from_channels(clamp(color.x, 0., 255.) as u8,
+                                           clamp(color.y, 0., 255.) as u8,
+                                           clamp(color.z, 0., 255.) as u8,
+                                           255);
+            im.put_pixel(x, y, color);
+        }
+    }
+    im
+}
+
+fn trace_ray(scene: &Scene, ray: &Ray, depth: u16, max_depth: u16) -> Vec3 {
+    let mut color = Vec3::new(0., 0., 0.); // TODO: Background color
+    if let Some((obj, hit)) = scene.intersect(ray) {
+        let material = obj.material();
+
+        // Ambient color
+        color = material.raw_color() * scene.ambient_coeff;
+
+        // Trace shadow rays
+        for light in scene.lights.iter() {
+            let pos = hit.pos + hit.normal * f32::EPSILON.sqrt();
+            let shadow_ray = Ray::new(pos, light.pos - pos);
+            if scene.intersect(&shadow_ray).is_none() {
+                // Diffuse/specular color
+                color = color + material.color(&shadow_ray, &ray, &hit) * light.intensity;
+            }
+        }
+
+        if depth >= max_depth {
+            return color;
+        }
+
+        // Get reflected color
+        let reflectivity = material.reflectivity();
+        if reflectivity > 0. {
+            let reflected_ray = reflected_ray(ray, &hit);
+            let reflected_color = trace_ray(scene, &reflected_ray, depth + 1, max_depth);
+            color = color + reflected_color * reflectivity;
+        }
+    }
+    color
+}
+
+fn reflected_ray(ray: &Ray, hit: &Intersection) -> Ray {
+    let pos = hit.pos + hit.normal * f32::EPSILON.sqrt();
+    let dir = ray.dir - hit.normal * 2. * dot(&ray.dir, &hit.normal);
+    Ray::new(pos, dir)
+}

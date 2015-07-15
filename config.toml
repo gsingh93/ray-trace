@@ -1,0 +1,6 @@
+[config]
+width = 640
+height = 480
+samples = 1
+out_file = "image.png"
+reflection_depth = 1

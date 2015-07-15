@@ -1,198 +1,58 @@
+extern crate tracerlib;
+
 extern crate image;
 extern crate nalgebra;
+extern crate toml;
 
-mod material;
-mod surface;
-mod texture;
+use std::fs::File;
+use std::io::Read;
 
-use std::f32;
+use tracerlib::{ray_trace, Camera, Material, PointLight, Scene, Vec3};
+use tracerlib::surface::{Plane, Sphere};
+use tracerlib::texture::{CheckerboardTexture, Texture};
 
-use material::Material;
-use surface::{Plane, Sphere, Surface};
-use texture::{CheckerboardTexture, ImageTexture, Texture};
-
-use image::{ImageBuffer, FilterType, Rgb, Pixel};
+use image::FilterType;
 use image::imageops::resize;
 
-use nalgebra::{clamp, cross, dot, Norm};
-
-pub type Vec3 = nalgebra::Vec3<f32>;
-
-const OUT_FILE: &'static str = "image.png";
-const WIDTH: u32 = 640;
-const HEIGHT: u32 = 480;
-
-const MAX_DEPTH: u16 = 1;
-
-const SUPER_SAMPLING: u32 = 1;
-const RENDER_WIDTH: u32 = SUPER_SAMPLING * WIDTH;
-const RENDER_HEIGHT: u32 = SUPER_SAMPLING * HEIGHT;
-const ASPECT_RATIO: f32 = WIDTH as f32 / HEIGHT as f32;
-
-#[derive(Debug)]
-pub struct Ray {
-    origin: Vec3,
-    dir: Vec3,
+struct Config {
+    width: u32,
+    height: u32,
+    out_file: String,
+    samples: u32,
+    reflection_depth: u16,
 }
 
-impl Ray {
-    fn new(origin: Vec3, dir: Vec3) -> Self {
-        Ray { origin: origin, dir: dir.normalize() }
-    }
-}
+impl Config {
+    fn new(filename: &str) -> Self {
+        let mut toml_str = String::new();
+        File::open(filename).unwrap().read_to_string(&mut toml_str).unwrap();
 
-#[derive(Clone, Debug)]
-pub struct Intersection {
-    pos: Vec3,
-    normal: Vec3,
-    dist: f32,
-    u: f32,
-    v: f32,
-}
+        let toml: toml::Value = toml_str.parse().unwrap();
+        let width = toml.lookup("config.width").unwrap().as_integer().unwrap();
+        let height = toml.lookup("config.height").unwrap().as_integer().unwrap();
+        let out_file = toml.lookup("config.out_file").unwrap().as_str().unwrap();
+        let samples = toml.lookup("config.samples").unwrap().as_integer().unwrap();
+        let depth = toml.lookup("config.reflection_depth").unwrap().as_integer().unwrap();
 
-impl Intersection {
-    fn new(pos: Vec3, normal: Vec3, dist: f32, u: f32, v: f32) -> Self {
-        Intersection { pos: pos, normal: normal, dist: dist, u: u, v: v }
-    }
-}
-
-struct Camera {
-    pos: Vec3,
-    dir: Vec3,
-    up: Vec3,
-    right: Vec3,
-}
-
-struct PointLight {
-    pos: Vec3,
-    color: Vec3,
-    intensity: f32,
-}
-
-impl PointLight {
-    fn new(pos: Vec3, color: Vec3, intensity: f32) -> Self {
-        PointLight { pos: pos, color: color, intensity: intensity }
-    }
-}
-
-struct Scene {
-    objects: Vec<Box<Surface>>,
-    lights: Vec<PointLight>,
-    ambient_coeff: f32,
-    ambient_color: Vec3,
-    camera: Camera,
-}
-
-impl Scene {
-    fn new(objects: Vec<Box<Surface>>,
-           lights: Vec<PointLight>,
-           ambient_coeff: f32,
-           ambient_color: Vec3,
-           camera: Camera) -> Self {
-        Scene {
-            objects: objects,
-            lights: lights,
-            ambient_coeff: ambient_coeff,
-            ambient_color: ambient_color,
-            camera: camera,
+        Config {
+            width: width as u32,
+            height: height as u32,
+            out_file: out_file.to_owned(),
+            samples: samples as u32,
+            reflection_depth: depth as u16,
         }
-    }
-
-    fn intersect(&self, ray: &Ray) -> Option<(&Box<Surface>, Intersection)> {
-        let mut result = None;
-        for obj in self.objects.iter() {
-            if let Some(hit) = obj.intersect(ray) {
-                match result.clone() {
-                    None => result = Some((obj, hit)),
-                    Some((_, ref old_hit)) =>
-                        if hit.dist < old_hit.dist { result = Some((obj, hit)) }
-                }
-            }
-        }
-        result
-    }
-}
-
-impl Camera {
-    fn new(pos: Vec3, dir: Vec3, up: Vec3) -> Self {
-        let right = cross(&up, &dir).normalize();
-        let up = cross(&right, &dir).normalize();
-        Camera { pos: pos, dir: dir.normalize(), up: up, right: right }
-    }
-
-    fn from_lookat(pos: Vec3, lookat: Vec3, up: Vec3) -> Self {
-        let dir = lookat - pos;
-        Camera::new(pos, dir, up)
-    }
-
-    fn get_ray(&self, x: u32, y: u32) -> Ray {
-        let norm_x = (x as f32 / RENDER_WIDTH as f32) - 0.5;
-        let norm_y = (y as f32 / RENDER_HEIGHT as f32) - 0.5;
-        let norm_x = norm_x * ASPECT_RATIO;
-
-        let dir = self.right * norm_x + self.up * norm_y + self.dir;
-        Ray::new(self.pos, dir)
     }
 }
 
 fn main() {
-    let mut im: ImageBuffer<Rgb<u8>, _> = ImageBuffer::new(RENDER_WIDTH, RENDER_HEIGHT);
+    let config = Config::new("config.toml");
     let scene = setup_scene();
 
-    for x in 0..RENDER_WIDTH {
-        for y in 0..RENDER_HEIGHT {
-            let ray = scene.camera.get_ray(x, y);
-            let color = trace_ray(&scene, &ray, 0);
+    let im = ray_trace(&scene, config.samples * config.width, config.samples * config.height,
+                       config.reflection_depth);
 
-            let color = Rgb::from_channels(clamp(color.x, 0., 255.) as u8,
-                                           clamp(color.y, 0., 255.) as u8,
-                                           clamp(color.z, 0., 255.) as u8,
-                                           255);
-            im.put_pixel(x, y, color);
-        }
-    }
-
-    let im = resize(&im, WIDTH, HEIGHT, FilterType::Triangle);
-    im.save(OUT_FILE).unwrap();
-}
-
-fn trace_ray(scene: &Scene, ray: &Ray, depth: u16) -> Vec3 {
-    let mut color = Vec3::new(0., 0., 0.); // TODO: Background color
-    if let Some((obj, hit)) = scene.intersect(ray) {
-        let material = obj.material();
-
-        // Ambient color
-        color = material.raw_color() * scene.ambient_coeff;
-
-        // Trace shadow rays
-        for light in scene.lights.iter() {
-            let pos = hit.pos + hit.normal * f32::EPSILON.sqrt();
-            let shadow_ray = Ray::new(pos, light.pos - pos);
-            if scene.intersect(&shadow_ray).is_none() {
-                // Diffuse/specular color
-                color = color + material.color(&shadow_ray, &ray, &hit) * light.intensity;
-            }
-        }
-
-        if depth >= MAX_DEPTH {
-            return color;
-        }
-
-        // Get reflected color
-        let reflectivity = material.reflectivity();
-        if reflectivity > 0. {
-            let reflected_ray = reflected_ray(ray, &hit);
-            let reflected_color = trace_ray(scene, &reflected_ray, depth + 1);
-            color = color + reflected_color * reflectivity;
-        }
-    }
-    color
-}
-
-fn reflected_ray(ray: &Ray, hit: &Intersection) -> Ray {
-    let pos = hit.pos + hit.normal * f32::EPSILON.sqrt();
-    let dir = ray.dir - hit.normal * 2. * dot(&ray.dir, &hit.normal);
-    Ray::new(pos, dir)
+    let im = resize(&im, config.width, config.height, FilterType::Triangle);
+    im.save(&config.out_file).unwrap();
 }
 
 fn setup_scene() -> Scene {
