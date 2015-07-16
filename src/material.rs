@@ -6,6 +6,8 @@ use ray::{Intersection, Ray};
 
 use nalgebra::{dot, Norm};
 
+use noise::{self, Brownian3, Seed};
+
 pub struct Material {
     color: Vec3,
     diffuse_coeff: f32,
@@ -13,6 +15,7 @@ pub struct Material {
     glossiness: f32,
     reflectivity: f32,
     texture: Option<Box<Texture>>,
+    normal_map: Option<NormalMap>,
 }
 
 impl Clone for Material {
@@ -24,16 +27,18 @@ impl Clone for Material {
             glossiness: self.glossiness,
             reflectivity: self.reflectivity,
             texture: self.texture.as_ref().map(|t| t.clone_()),
+            normal_map: self.normal_map.as_ref().map(|m| m.clone()),
         }
     }
 }
 
 impl Material {
     pub fn new(color: Vec3, diffuse_coeff: f32, specular_coeff: f32, glossiness: f32,
-               reflectivity: f32, texture: Option<Box<Texture>>) -> Self {
+               reflectivity: f32, texture: Option<Box<Texture>>,
+               normal_map: Option<NormalMap>) -> Self {
         Material { color: color, diffuse_coeff: diffuse_coeff,
                    specular_coeff: specular_coeff, glossiness: glossiness,
-                   reflectivity: reflectivity, texture: texture }
+                   reflectivity: reflectivity, texture: texture, normal_map: normal_map }
     }
 
     pub fn reflectivity(&self) -> f32 {
@@ -58,5 +63,63 @@ impl Material {
         let specular_color = Vec3::new(255., 255., 255.) * f * self.specular_coeff;
 
         diffuse_color + specular_color
+    }
+
+    pub fn has_normal_map(&self) -> bool {
+        self.normal_map.is_some()
+    }
+
+    pub fn apply_normal_map(&self, normal: &Vec3, hit_pos: &Vec3) -> (Vec3, Vec3) {
+        match &self.normal_map {
+            &Some(ref map) => map.map(normal, hit_pos),
+            &None => (*normal, *hit_pos)
+        }
+    }
+}
+
+pub struct NormalMap {
+    seed: Seed,
+    seed_val: u32,
+    octaves: usize,
+    wavelength: f32,
+    persistence: f32,
+    lacunarity: f32,
+}
+
+impl Clone for NormalMap {
+    fn clone(&self) -> Self {
+        let seed = Seed::new(self.seed_val);
+        NormalMap { seed: seed, seed_val: self.seed_val, octaves: self.octaves,
+                    wavelength: self.wavelength,
+                    persistence: self.persistence, lacunarity: self.lacunarity }
+
+    }
+}
+
+impl NormalMap {
+    pub fn new(seed_val: u32, octaves: usize, wavelength: f32, persistence: f32,
+               lacunarity: f32) -> Self {
+        let seed = Seed::new(seed_val);
+
+        NormalMap { seed: seed, seed_val: seed_val, octaves: octaves, wavelength: wavelength,
+                    persistence: persistence, lacunarity: lacunarity }
+    }
+
+    fn map(&self, normal: &Vec3, hit_pos: &Vec3) -> (Vec3, Vec3) {
+        let noise = Brownian3::new(noise::perlin3, self.octaves)
+            .wavelength(self.wavelength) // 6.25
+            .persistence(self.persistence) // .22
+            .lacunarity(self.lacunarity); // 1.9
+        let val = noise.apply(&self.seed, &[hit_pos.x, hit_pos.y, hit_pos.z]) + 1.0;
+        let mut val = val/2.;
+
+        if val < 0. {
+            val = 0.
+        }
+        let noise_vec = Vec3::new(val, val, val);
+        //println!("val: {}", val);
+        let new_normal = (*normal + noise_vec).normalize();
+        //println!("new_normal: {:?}", new_normal);
+        (new_normal, *hit_pos + noise_vec)
     }
 }

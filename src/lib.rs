@@ -1,5 +1,6 @@
 extern crate image;
 extern crate nalgebra;
+extern crate noise;
 
 pub mod light;
 pub mod material;
@@ -10,7 +11,6 @@ pub mod texture;
 use std::f32;
 
 use light::PointLight;
-pub use material::Material;
 use ray::{Intersection, Ray};
 use surface::Surface;
 use texture::Texture;

@@ -1,0 +1,65 @@
+[[material]]
+name = "plane_material"
+color = [2, 62, 112]
+diffuse = 0.4
+specular = 0.5
+glossiness = 40.0
+reflectivity = 1.0
+normal_map = [11.0, 4.0, 6.25, 0.9, 3.0]
+
+[scene]
+ambient_const = 0.1
+ambient_color = [255, 255, 255]
+
+[scene.camera]
+pos = [0.0, 2.0, 5.0]
+lookat = [0.0, 1.0, 0.0]
+up = [0.0, 1.0, 0.0]
+
+[[scene.surface]]
+type = "plane"
+material = "plane_material"
+pos = [1.0, 0.0, 1.0]
+normal = [0.0, 1.0, 0.0]
+
+[[scene.light]]
+type = "point"
+pos = [-1.0, 1.0, 0.0]
+color = [0, 255, 0]
+intensity = 0.5
+
+[[scene.light]]
+type = "point"
+pos = [1.0, 2.0, -1.0]
+color = [0, 255, 0]
+intensity = 1.0
+
+[[scene.light]]
+type = "point"
+pos = [-1.0, 1.0, -2.0]
+color = [0, 255, 0]
+intensity = 0.5
+
+[[scene.light]]
+type = "point"
+pos = [1.0, 2.0, -3.0]
+color = [0, 255, 0]
+intensity = 1.0
+
+[[scene.light]]
+type = "point"
+pos = [1.0, 2.0, 1.0]
+color = [0, 255, 0]
+intensity = 1.0
+
+[[scene.light]]
+type = "point"
+pos = [-1.0, 1.0, 2.0]
+color = [0, 255, 0]
+intensity = 0.5
+
+[[scene.light]]
+type = "point"
+pos = [3.0, 2.0, 3.0]
+color = [0, 255, 0]
+intensity = 0.5

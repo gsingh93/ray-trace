@@ -8,8 +8,9 @@ use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::Read;
 
-use tracerlib::{ray_trace, Camera, Material, Scene, Vec3};
+use tracerlib::{ray_trace, Camera, Scene, Vec3};
 use tracerlib::light::PointLight;
+use tracerlib::material::{Material, NormalMap};
 use tracerlib::surface::{Plane, Sphere, Surface};
 use tracerlib::texture::{CheckerboardTexture, ImageTexture, Texture};
 
@@ -101,7 +102,18 @@ fn decode_material(material: &toml::Value) -> (String, Material) {
         }
     };
 
-    let m = Material::new(color, diffuse, specular, glossiness, reflectivity, texture);
+    let normal_map = if let Some(map) = material.lookup("normal_map") {
+        let v = map.as_slice().unwrap();
+        let seed = v[0].as_float().unwrap() as u32;
+        let octaves = v[1].as_float().unwrap() as usize;
+        let wavelength = v[2].as_float().unwrap() as f32;
+        let persistence = v[3].as_float().unwrap() as f32;
+        let lacunarity = v[4].as_float().unwrap() as f32;
+        Some(NormalMap::new(seed, octaves, wavelength, persistence, lacunarity))
+    } else {
+        None
+    };
+    let m = Material::new(color, diffuse, specular, glossiness, reflectivity, texture, normal_map);
     (name, m)
 }
 

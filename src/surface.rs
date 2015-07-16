@@ -58,13 +58,15 @@ impl Surface for Sphere {
             };
 
             let pos = ray.origin + ray.dir * d;
-            let normal = (pos - self.pos).normalize();
+            let mut normal = (pos - self.pos).normalize();
+
+            if self.material.has_normal_map() {
+                normal = self.material.apply_normal_map(&normal, &pos).0;
+            }
+
             let center_vec = (self.pos - pos).normalize();
             let u = 0.5 + center_vec.z.atan2(center_vec.x) / (2. * f32::consts::PI);
             let v = 0.5 - center_vec.y.atan() / f32::consts::PI;
-
-            // println!("u: {}", u);
-            // println!("v: {}", v);
 
             Some(Intersection::new(pos, normal, d, u, v))
         } else {
@@ -106,14 +108,16 @@ impl Surface for Plane {
             let n = &self.normal;
             let u_axis = Vec3 { x: n.y, y: n.z, z: -n.x };
             let v_axis = cross(&u_axis, n);
-            //println!("v_axis: {:?}", v_axis);
             let u = dot(&pos, &u_axis);
             let v = dot(&pos, &v_axis);
 
-            // println!("u: {}", u);
-            // println!("v: {}", v);
+            let (normal, pos) = if self.material.has_normal_map() {
+                self.material.apply_normal_map(&self.normal, &pos)
+            } else {
+                (self.normal, pos)
+            };
 
-            Some(Intersection::new(pos, self.normal, d, u, v))
+            Some(Intersection::new(pos, normal, d, u, v))
         } else {
             None
         }
