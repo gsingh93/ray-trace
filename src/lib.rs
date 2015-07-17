@@ -119,8 +119,16 @@ fn trace_ray(scene: &Scene, ray: &Ray, depth: u16, max_depth: u16) -> Vec3 {
         // Trace shadow rays
         for light in scene.lights.iter() {
             let pos = hit.pos + hit.normal * f32::EPSILON.sqrt();
-            let shadow_ray = Ray::new(pos, *light.pos() - pos);
-            if scene.intersect(&shadow_ray).is_none() {
+            let dir = *light.pos() - pos;
+            let dist = dir.norm();
+            let shadow_ray = Ray::new(pos, dir);
+            if let Some((_, shadow_hit)) = scene.intersect(&shadow_ray) {
+                if shadow_hit.dist > dist {
+                    // Diffuse/specular color
+                    color = color + material.color(&shadow_ray, &ray, &hit)
+                        * (*light.color() / 255.) * light.intensity();
+                }
+            } else {
                 // Diffuse/specular color
                 color = color + material.color(&shadow_ray, &ray, &hit)
                     * (*light.color() / 255.) * light.intensity();
