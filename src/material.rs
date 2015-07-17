@@ -16,6 +16,7 @@ pub struct Material {
     reflectivity: f32,
     texture: Option<Box<Texture>>,
     normal_map: Option<NormalMap>,
+    displacement_map: Option<DisplacementMap>,
 }
 
 impl Clone for Material {
@@ -28,6 +29,7 @@ impl Clone for Material {
             reflectivity: self.reflectivity,
             texture: self.texture.as_ref().map(|t| t.clone_()),
             normal_map: self.normal_map.as_ref().map(|m| m.clone()),
+            displacement_map: self.displacement_map.as_ref().map(|m| m.clone()),
         }
     }
 }
@@ -35,10 +37,11 @@ impl Clone for Material {
 impl Material {
     pub fn new(color: Vec3, diffuse_coeff: f32, specular_coeff: f32, glossiness: f32,
                reflectivity: f32, texture: Option<Box<Texture>>,
-               normal_map: Option<NormalMap>) -> Self {
+               normal_map: Option<NormalMap>, displacement_map: Option<DisplacementMap>) -> Self {
         Material { color: color, diffuse_coeff: diffuse_coeff,
                    specular_coeff: specular_coeff, glossiness: glossiness,
-                   reflectivity: reflectivity, texture: texture, normal_map: normal_map }
+                   reflectivity: reflectivity, texture: texture, normal_map: normal_map,
+                   displacement_map: displacement_map }
     }
 
     pub fn reflectivity(&self) -> f32 {
@@ -69,10 +72,21 @@ impl Material {
         self.normal_map.is_some()
     }
 
-    pub fn apply_normal_map(&self, normal: &Vec3, hit_pos: &Vec3) -> (Vec3, Vec3) {
+    pub fn has_displacement_map(&self) -> bool {
+        self.displacement_map.is_some()
+    }
+
+    pub fn apply_normal_map(&self, normal: &Vec3, hit_pos: &Vec3) -> Vec3 {
         match &self.normal_map {
             &Some(ref map) => map.map(normal, hit_pos),
-            &None => (*normal, *hit_pos)
+            &None => *normal
+        }
+    }
+
+    pub fn apply_displacement_map(&self, hit_pos: &Vec3) -> Vec3 {
+        match &self.displacement_map {
+            &Some(ref map) => map.map(hit_pos),
+            &None => *hit_pos
         }
     }
 }
@@ -92,7 +106,6 @@ impl Clone for NormalMap {
         NormalMap { seed: seed, seed_val: self.seed_val, octaves: self.octaves,
                     wavelength: self.wavelength,
                     persistence: self.persistence, lacunarity: self.lacunarity }
-
     }
 }
 
@@ -105,21 +118,59 @@ impl NormalMap {
                     persistence: persistence, lacunarity: lacunarity }
     }
 
-    fn map(&self, normal: &Vec3, hit_pos: &Vec3) -> (Vec3, Vec3) {
+    fn map(&self, normal: &Vec3, hit_pos: &Vec3) -> Vec3 {
         let noise = Brownian3::new(noise::perlin3, self.octaves)
-            .wavelength(self.wavelength) // 6.25
-            .persistence(self.persistence) // .22
-            .lacunarity(self.lacunarity); // 1.9
-        let val = noise.apply(&self.seed, &[hit_pos.x, hit_pos.y, hit_pos.z]) + 1.0;
-        let mut val = val/2.;
+            .wavelength(self.wavelength)
+            .persistence(self.persistence)
+            .lacunarity(self.lacunarity);
+        let mut val = noise.apply(&self.seed, &[hit_pos.x, hit_pos.y, hit_pos.z]) + 1.0;
+        val = val / 2.;
 
         if val < 0. {
             val = 0.
         }
-        let noise_vec = Vec3::new(val, val, val);
-        //println!("val: {}", val);
-        let new_normal = (*normal + noise_vec).normalize();
-        //println!("new_normal: {:?}", new_normal);
-        (new_normal, *hit_pos + noise_vec)
+        (*normal + Vec3::new(val, val, val)).normalize()
+    }
+}
+
+pub struct DisplacementMap {
+    seed: Seed,
+    seed_val: u32,
+    octaves: usize,
+    wavelength: f32,
+    persistence: f32,
+    lacunarity: f32,
+}
+
+impl Clone for DisplacementMap {
+    fn clone(&self) -> Self {
+        let seed = Seed::new(self.seed_val);
+        DisplacementMap { seed: seed, seed_val: self.seed_val, octaves: self.octaves,
+                          wavelength: self.wavelength,
+                          persistence: self.persistence, lacunarity: self.lacunarity }
+    }
+}
+
+impl DisplacementMap {
+    pub fn new(seed_val: u32, octaves: usize, wavelength: f32, persistence: f32,
+               lacunarity: f32) -> Self {
+        let seed = Seed::new(seed_val);
+
+        DisplacementMap { seed: seed, seed_val: seed_val, octaves: octaves, wavelength: wavelength,
+                          persistence: persistence, lacunarity: lacunarity }
+    }
+
+    fn map(&self, hit_pos: &Vec3) -> Vec3 {
+        let noise = Brownian3::new(noise::perlin3, self.octaves)
+            .wavelength(self.wavelength)
+            .persistence(self.persistence)
+            .lacunarity(self.lacunarity);
+        let mut val = noise.apply(&self.seed, &[hit_pos.x, hit_pos.y, hit_pos.z]) + 1.0;
+        //let mut val = val / 2.;
+
+        if val < 0. {
+            val = 0.
+        }
+        *hit_pos + Vec3::new(val, val, val)
     }
 }

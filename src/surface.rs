@@ -58,11 +58,19 @@ impl Surface for Sphere {
             };
 
             let pos = ray.origin + ray.dir * d;
-            let mut normal = (pos - self.pos).normalize();
+            let normal = (pos - self.pos).normalize();
 
-            if self.material.has_normal_map() {
-                normal = self.material.apply_normal_map(&normal, &pos).0;
-            }
+            let normal = if self.material.has_normal_map() {
+                self.material.apply_normal_map(&normal, &pos)
+            } else {
+                normal
+            };
+
+            let pos = if self.material.has_displacement_map() {
+                self.material.apply_displacement_map(&pos)
+            } else {
+                pos
+            };
 
             let center_vec = (self.pos - pos).normalize();
             let u = 0.5 + center_vec.z.atan2(center_vec.x) / (2. * f32::consts::PI);
@@ -111,10 +119,16 @@ impl Surface for Plane {
             let u = dot(&pos, &u_axis);
             let v = dot(&pos, &v_axis);
 
-            let (normal, pos) = if self.material.has_normal_map() {
+            let normal = if self.material.has_normal_map() {
                 self.material.apply_normal_map(&self.normal, &pos)
             } else {
-                (self.normal, pos)
+                self.normal
+            };
+
+            let pos = if self.material.has_displacement_map() {
+                self.material.apply_displacement_map(&pos)
+            } else {
+                pos
             };
 
             Some(Intersection::new(pos, normal, d, u, v))

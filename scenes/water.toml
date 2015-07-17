@@ -6,6 +6,7 @@ specular = 0.5
 glossiness = 40.0
 reflectivity = 1.0
 normal_map = [11.0, 4.0, 6.25, 0.9, 3.0]
+displacement_map = [11.0, 2.0, 6.25, 0.9, 3.0]
 
 [scene]
 ambient_const = 0.1
@@ -25,41 +26,41 @@ normal = [0.0, 1.0, 0.0]
 [[scene.light]]
 type = "point"
 pos = [-1.0, 1.0, 0.0]
-color = [0, 255, 0]
+color = [255, 255, 255]
 intensity = 0.5
 
 [[scene.light]]
 type = "point"
 pos = [1.0, 2.0, -1.0]
-color = [0, 255, 0]
+color = [255, 255, 255]
 intensity = 1.0
 
 [[scene.light]]
 type = "point"
 pos = [-1.0, 1.0, -2.0]
-color = [0, 255, 0]
+color = [255, 255, 255]
 intensity = 0.5
 
 [[scene.light]]
 type = "point"
 pos = [1.0, 2.0, -3.0]
-color = [0, 255, 0]
+color = [255, 255, 255]
 intensity = 1.0
 
 [[scene.light]]
 type = "point"
 pos = [1.0, 2.0, 1.0]
-color = [0, 255, 0]
+color = [255, 255, 255]
 intensity = 1.0
 
 [[scene.light]]
 type = "point"
 pos = [-1.0, 1.0, 2.0]
-color = [0, 255, 0]
+color = [255, 255, 255]
 intensity = 0.5
 
 [[scene.light]]
 type = "point"
 pos = [3.0, 2.0, 3.0]
-color = [0, 255, 0]
+color = [255, 255, 255]
 intensity = 0.5
