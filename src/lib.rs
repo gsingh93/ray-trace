@@ -13,13 +13,12 @@ use std::f32;
 use light::PointLight;
 use ray::{Intersection, Ray};
 use surface::Surface;
-use texture::Texture;
 
 use image::{RgbImage, Rgb, Pixel};
 
 use nalgebra::{clamp, cross, dot, Norm};
 
-pub type Vec3 = nalgebra::Vec3<f32>;
+pub type Vec3 = nalgebra::Vector3<f32>;
 
 #[derive(Debug)]
 pub struct Camera {
