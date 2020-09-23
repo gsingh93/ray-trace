@@ -8,11 +8,11 @@ use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::Read;
 
-use tracerlib::{ray_trace, Camera, Scene, Vec3};
 use tracerlib::light::PointLight;
 use tracerlib::material::{DisplacementMap, Material, NormalMap};
 use tracerlib::surface::{Plane, Sphere, Surface};
 use tracerlib::texture::{CheckerboardTexture, ImageTexture, Texture};
+use tracerlib::{ray_trace, Camera, Scene, Vec3};
 
 use image::imageops::{resize, FilterType};
 
@@ -28,7 +28,10 @@ struct Config {
 impl Config {
     fn new(filename: &str) -> Self {
         let mut toml_str = String::new();
-        File::open(filename).unwrap().read_to_string(&mut toml_str).unwrap();
+        File::open(filename)
+            .unwrap()
+            .read_to_string(&mut toml_str)
+            .unwrap();
 
         let toml: toml::Value = toml_str.parse().unwrap();
         let config = toml["config"].as_table().unwrap();
@@ -54,8 +57,12 @@ fn main() {
     let config = Config::new("config.toml");
     let scene = setup_scene(&config.scene);
 
-    let im = ray_trace(&scene, config.samples * config.width, config.samples * config.height,
-                       config.reflection_depth);
+    let im = ray_trace(
+        &scene,
+        config.samples * config.width,
+        config.samples * config.height,
+        config.reflection_depth,
+    );
 
     let im = resize(&im, config.width, config.height, FilterType::Triangle);
     im.save(&config.out_file).unwrap();
@@ -67,7 +74,10 @@ fn setup_scene(scene: &str) -> Scene {
     path.push_str(&scene);
 
     let mut toml_str = String::new();
-    File::open(path).unwrap().read_to_string(&mut toml_str).unwrap();
+    File::open(path)
+        .unwrap()
+        .read_to_string(&mut toml_str)
+        .unwrap();
 
     let toml: toml::Value = toml_str.parse().unwrap();
 
@@ -92,8 +102,9 @@ fn decode_material(material: &toml::Value) -> (String, Material) {
     let glossiness = material["glossiness"].as_float().unwrap() as f32;
     let reflectivity = material["reflectivity"].as_float().unwrap() as f32;
     let texture = if let Some(checkerboard) = material.get("checkerboard") {
-        Some(Box::new(CheckerboardTexture::new(checkerboard.as_float().unwrap() as f32))
-             as Box<dyn Texture>)
+        Some(Box::new(CheckerboardTexture::new(
+            checkerboard.as_float().unwrap() as f32
+        )) as Box<dyn Texture>)
     } else {
         if let Some(texture) = material.get("texture") {
             Some(Box::new(ImageTexture::new(texture.as_str().unwrap())) as Box<dyn Texture>)
@@ -109,7 +120,13 @@ fn decode_material(material: &toml::Value) -> (String, Material) {
         let wavelength = v[2].as_float().unwrap() as f32;
         let persistence = v[3].as_float().unwrap() as f32;
         let lacunarity = v[4].as_float().unwrap() as f32;
-        Some(NormalMap::new(seed, octaves, wavelength, persistence, lacunarity))
+        Some(NormalMap::new(
+            seed,
+            octaves,
+            wavelength,
+            persistence,
+            lacunarity,
+        ))
     } else {
         None
     };
@@ -121,12 +138,26 @@ fn decode_material(material: &toml::Value) -> (String, Material) {
         let wavelength = v[2].as_float().unwrap() as f32;
         let persistence = v[3].as_float().unwrap() as f32;
         let lacunarity = v[4].as_float().unwrap() as f32;
-        Some(DisplacementMap::new(seed, octaves, wavelength, persistence, lacunarity))
+        Some(DisplacementMap::new(
+            seed,
+            octaves,
+            wavelength,
+            persistence,
+            lacunarity,
+        ))
     } else {
         None
     };
-    let m = Material::new(color, diffuse, specular, glossiness, reflectivity, texture, normal_map,
-                          displacement_map);
+    let m = Material::new(
+        color,
+        diffuse,
+        specular,
+        glossiness,
+        reflectivity,
+        texture,
+        normal_map,
+        displacement_map,
+    );
     (name, m)
 }
 
@@ -147,8 +178,10 @@ fn decode_camera(camera: &toml::Value) -> Camera {
     Camera::from_lookat(pos, lookat, up)
 }
 
-fn decode_surfaces(surfaces: &toml::Value, materials: BTreeMap<String, Material>)
-                   -> Vec<Box<dyn Surface>> {
+fn decode_surfaces(
+    surfaces: &toml::Value,
+    materials: BTreeMap<String, Material>,
+) -> Vec<Box<dyn Surface>> {
     let mut v = Vec::new();
     for surface in surfaces.as_array().unwrap() {
         v.push(decode_surface(surface, &materials))
@@ -156,7 +189,10 @@ fn decode_surfaces(surfaces: &toml::Value, materials: BTreeMap<String, Material>
     v
 }
 
-fn decode_surface(surface: &toml::Value, materials: &BTreeMap<String, Material>) -> Box<dyn Surface> {
+fn decode_surface(
+    surface: &toml::Value,
+    materials: &BTreeMap<String, Material>,
+) -> Box<dyn Surface> {
     let material_name = surface["material"].as_str().unwrap();
     let material = materials.get(material_name).unwrap().clone();
 
@@ -164,7 +200,7 @@ fn decode_surface(surface: &toml::Value, materials: &BTreeMap<String, Material>)
     match type_ {
         "plane" => Box::new(decode_plane(surface, material)),
         "sphere" => Box::new(decode_sphere(surface, material)),
-        _ => panic!("Unsupported object type: {}", type_)
+        _ => panic!("Unsupported object type: {}", type_),
     }
 }
 
@@ -205,12 +241,16 @@ fn decode_string(s: &toml::Value) -> String {
 fn decode_vec3(vec: &toml::Value) -> Vec3 {
     let v = vec.as_array().unwrap();
     if v[0].as_float().is_none() {
-        Vec3::new(v[0].as_integer().unwrap() as f32,
-                  v[1].as_integer().unwrap() as f32,
-                  v[2].as_integer().unwrap() as f32)
+        Vec3::new(
+            v[0].as_integer().unwrap() as f32,
+            v[1].as_integer().unwrap() as f32,
+            v[2].as_integer().unwrap() as f32,
+        )
     } else {
-        Vec3::new(v[0].as_float().unwrap() as f32,
-                  v[1].as_float().unwrap() as f32,
-                  v[2].as_float().unwrap() as f32)
+        Vec3::new(
+            v[0].as_float().unwrap() as f32,
+            v[1].as_float().unwrap() as f32,
+            v[2].as_float().unwrap() as f32,
+        )
     }
 }

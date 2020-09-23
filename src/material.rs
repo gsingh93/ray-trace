@@ -1,8 +1,8 @@
 use std::f32;
 
-use Vec3;
-use texture::Texture;
 use ray::{Intersection, Ray};
+use texture::Texture;
+use Vec3;
 
 use noise::{Fbm, MultiFractal, NoiseFn, Seedable};
 
@@ -33,13 +33,26 @@ impl Clone for Material {
 }
 
 impl Material {
-    pub fn new(color: Vec3, diffuse_coeff: f32, specular_coeff: f32, glossiness: f32,
-               reflectivity: f32, texture: Option<Box<dyn Texture>>,
-               normal_map: Option<NormalMap>, displacement_map: Option<DisplacementMap>) -> Self {
-        Material { color: color, diffuse_coeff: diffuse_coeff,
-                   specular_coeff: specular_coeff, glossiness: glossiness,
-                   reflectivity: reflectivity, texture: texture, normal_map: normal_map,
-                   displacement_map: displacement_map }
+    pub fn new(
+        color: Vec3,
+        diffuse_coeff: f32,
+        specular_coeff: f32,
+        glossiness: f32,
+        reflectivity: f32,
+        texture: Option<Box<dyn Texture>>,
+        normal_map: Option<NormalMap>,
+        displacement_map: Option<DisplacementMap>,
+    ) -> Self {
+        Material {
+            color: color,
+            diffuse_coeff: diffuse_coeff,
+            specular_coeff: specular_coeff,
+            glossiness: glossiness,
+            reflectivity: reflectivity,
+            texture: texture,
+            normal_map: normal_map,
+            displacement_map: displacement_map,
+        }
     }
 
     pub fn reflectivity(&self) -> f32 {
@@ -52,10 +65,11 @@ impl Material {
 
     pub fn color(&self, shadow_ray: &Ray, camera_ray: &Ray, hit: &Intersection) -> Vec3 {
         let f = f32::max(0., hit.normal.dot(&shadow_ray.dir));
-        let diffuse_color = (self.color * f * self.diffuse_coeff).component_mul(&match self.texture {
-            Some(ref t) => t.color(hit.u, hit.v) / 255.,
-            None => Vec3::new(1., 1., 1.)
-        });
+        let diffuse_color =
+            (self.color * f * self.diffuse_coeff).component_mul(&match self.texture {
+                Some(ref t) => t.color(hit.u, hit.v) / 255.,
+                None => Vec3::new(1., 1., 1.),
+            });
 
         // Average the angles, flipping the camera ray because it's in the opposite direction
         let half_vec = ((shadow_ray.dir - camera_ray.dir) / 2.).normalize();
@@ -77,14 +91,14 @@ impl Material {
     pub fn apply_normal_map(&self, normal: &Vec3, hit_pos: &Vec3) -> Vec3 {
         match &self.normal_map {
             &Some(ref map) => map.map(normal, hit_pos),
-            &None => *normal
+            &None => *normal,
         }
     }
 
     pub fn apply_displacement_map(&self, hit_pos: &Vec3) -> Vec3 {
         match &self.displacement_map {
             &Some(ref map) => map.map(hit_pos),
-            &None => *hit_pos
+            &None => *hit_pos,
         }
     }
 }
@@ -99,17 +113,31 @@ pub struct NormalMap {
 
 impl Clone for NormalMap {
     fn clone(&self) -> Self {
-        NormalMap { seed_val: self.seed_val, octaves: self.octaves,
-                    wavelength: self.wavelength,
-                    persistence: self.persistence, lacunarity: self.lacunarity }
+        NormalMap {
+            seed_val: self.seed_val,
+            octaves: self.octaves,
+            wavelength: self.wavelength,
+            persistence: self.persistence,
+            lacunarity: self.lacunarity,
+        }
     }
 }
 
 impl NormalMap {
-    pub fn new(seed_val: u32, octaves: usize, wavelength: f32, persistence: f32,
-               lacunarity: f32) -> Self {
-        NormalMap { seed_val: seed_val, octaves: octaves, wavelength: wavelength,
-                    persistence: persistence, lacunarity: lacunarity }
+    pub fn new(
+        seed_val: u32,
+        octaves: usize,
+        wavelength: f32,
+        persistence: f32,
+        lacunarity: f32,
+    ) -> Self {
+        NormalMap {
+            seed_val: seed_val,
+            octaves: octaves,
+            wavelength: wavelength,
+            persistence: persistence,
+            lacunarity: lacunarity,
+        }
     }
 
     fn map(&self, normal: &Vec3, hit_pos: &Vec3) -> Vec3 {
@@ -140,17 +168,31 @@ pub struct DisplacementMap {
 
 impl Clone for DisplacementMap {
     fn clone(&self) -> Self {
-        DisplacementMap { seed_val: self.seed_val, octaves: self.octaves,
-                          wavelength: self.wavelength,
-                          persistence: self.persistence, lacunarity: self.lacunarity }
+        DisplacementMap {
+            seed_val: self.seed_val,
+            octaves: self.octaves,
+            wavelength: self.wavelength,
+            persistence: self.persistence,
+            lacunarity: self.lacunarity,
+        }
     }
 }
 
 impl DisplacementMap {
-    pub fn new(seed_val: u32, octaves: usize, wavelength: f32, persistence: f32,
-               lacunarity: f32) -> Self {
-        DisplacementMap { seed_val: seed_val, octaves: octaves, wavelength: wavelength,
-                          persistence: persistence, lacunarity: lacunarity }
+    pub fn new(
+        seed_val: u32,
+        octaves: usize,
+        wavelength: f32,
+        persistence: f32,
+        lacunarity: f32,
+    ) -> Self {
+        DisplacementMap {
+            seed_val: seed_val,
+            octaves: octaves,
+            wavelength: wavelength,
+            persistence: persistence,
+            lacunarity: lacunarity,
+        }
     }
 
     fn map(&self, hit_pos: &Vec3) -> Vec3 {

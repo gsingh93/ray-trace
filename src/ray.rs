@@ -8,7 +8,10 @@ pub struct Ray {
 
 impl Ray {
     pub fn new(origin: Vec3, dir: Vec3) -> Self {
-        Ray { origin: origin, dir: dir.normalize() }
+        Ray {
+            origin: origin,
+            dir: dir.normalize(),
+        }
     }
 }
 
@@ -23,6 +26,12 @@ pub struct Intersection {
 
 impl Intersection {
     pub fn new(pos: Vec3, normal: Vec3, dist: f32, u: f32, v: f32) -> Self {
-        Intersection { pos: pos, normal: normal, dist: dist, u: u, v: v }
+        Intersection {
+            pos: pos,
+            normal: normal,
+            dist: dist,
+            u: u,
+            v: v,
+        }
     }
 }

@@ -1,8 +1,8 @@
 use std::f32;
 
-use Vec3;
 use material::Material;
 use ray::{Intersection, Ray};
+use Vec3;
 
 pub trait Surface {
     fn intersect(&self, &Ray) -> Option<Intersection>;
@@ -19,7 +19,11 @@ pub struct Sphere {
 
 impl Sphere {
     pub fn new(pos: Vec3, radius: f32, material: Material) -> Self {
-        Sphere { pos: pos, radius: radius, material: material }
+        Sphere {
+            pos: pos,
+            radius: radius,
+            material: material,
+        }
     }
 }
 
@@ -52,7 +56,7 @@ impl Surface for Sphere {
                 d1
             } else {
                 // Both are negative, sphere is behind camera
-                return None
+                return None;
             };
 
             let pos = ray.origin + ray.dir * d;
@@ -89,7 +93,11 @@ pub struct Plane {
 
 impl Plane {
     pub fn new(point: Vec3, normal: Vec3, material: Material) -> Self {
-        Plane { point: point, normal: normal, material: material }
+        Plane {
+            point: point,
+            normal: normal,
+            material: material,
+        }
     }
 }
 
