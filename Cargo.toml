@@ -2,6 +2,7 @@
 name = "ray-tracer"
 version = "0.1.0"
 authors = ["Gulshan Singh <gsingh2011@gmail.com>"]
+edition = "2018"
 
 [lib]
 name = "tracerlib"

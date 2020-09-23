@@ -1,4 +1,4 @@
-use Vec3;
+use crate::Vec3;
 
 pub struct PointLight {
     pos: Vec3,

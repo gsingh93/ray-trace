@@ -1,4 +1,4 @@
-use Vec3;
+use crate::Vec3;
 
 use image::{self, DynamicImage, RgbImage};
 

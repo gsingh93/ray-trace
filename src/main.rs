@@ -1,9 +1,3 @@
-extern crate tracerlib;
-
-extern crate image;
-extern crate nalgebra;
-extern crate toml;
-
 use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::Read;

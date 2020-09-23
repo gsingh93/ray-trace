@@ -1,7 +1,3 @@
-extern crate image;
-extern crate nalgebra;
-extern crate noise;
-
 pub mod light;
 pub mod material;
 mod ray;

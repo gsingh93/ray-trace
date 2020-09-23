@@ -1,11 +1,11 @@
 use std::f32;
 
-use material::Material;
-use ray::{Intersection, Ray};
-use Vec3;
+use crate::material::Material;
+use crate::ray::{Intersection, Ray};
+use crate::Vec3;
 
 pub trait Surface {
-    fn intersect(&self, &Ray) -> Option<Intersection>;
+    fn intersect(&self, ray: &Ray) -> Option<Intersection>;
     fn material(&self) -> &Material;
     // For debugging
     fn name(&self) -> &'static str;

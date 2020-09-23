@@ -1,8 +1,8 @@
 use std::f32;
 
-use ray::{Intersection, Ray};
-use texture::Texture;
-use Vec3;
+use crate::ray::{Intersection, Ray};
+use crate::texture::Texture;
+use crate::Vec3;
 
 use noise::{Fbm, MultiFractal, NoiseFn, Seedable};
 
