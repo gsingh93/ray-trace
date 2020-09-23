@@ -4,9 +4,7 @@ use Vec3;
 use texture::Texture;
 use ray::{Intersection, Ray};
 
-use nalgebra::{dot, Norm};
-
-use noise::{self, Brownian3, Seed};
+use noise::{Fbm, MultiFractal, NoiseFn, Seedable};
 
 pub struct Material {
     color: Vec3,
@@ -14,7 +12,7 @@ pub struct Material {
     specular_coeff: f32,
     glossiness: f32,
     reflectivity: f32,
-    texture: Option<Box<Texture>>,
+    texture: Option<Box<dyn Texture>>,
     normal_map: Option<NormalMap>,
     displacement_map: Option<DisplacementMap>,
 }
@@ -36,7 +34,7 @@ impl Clone for Material {
 
 impl Material {
     pub fn new(color: Vec3, diffuse_coeff: f32, specular_coeff: f32, glossiness: f32,
-               reflectivity: f32, texture: Option<Box<Texture>>,
+               reflectivity: f32, texture: Option<Box<dyn Texture>>,
                normal_map: Option<NormalMap>, displacement_map: Option<DisplacementMap>) -> Self {
         Material { color: color, diffuse_coeff: diffuse_coeff,
                    specular_coeff: specular_coeff, glossiness: glossiness,
@@ -53,15 +51,15 @@ impl Material {
     }
 
     pub fn color(&self, shadow_ray: &Ray, camera_ray: &Ray, hit: &Intersection) -> Vec3 {
-        let f = f32::max(0., dot(&hit.normal, &shadow_ray.dir));
-        let diffuse_color = self.color * f * self.diffuse_coeff * match self.texture {
+        let f = f32::max(0., hit.normal.dot(&shadow_ray.dir));
+        let diffuse_color = (self.color * f * self.diffuse_coeff).component_mul(&match self.texture {
             Some(ref t) => t.color(hit.u, hit.v) / 255.,
             None => Vec3::new(1., 1., 1.)
-        };
+        });
 
         // Average the angles, flipping the camera ray because it's in the opposite direction
         let half_vec = ((shadow_ray.dir - camera_ray.dir) / 2.).normalize();
-        let f = f32::max(0., dot(&half_vec, &hit.normal)).powf(self.glossiness);
+        let f = f32::max(0., half_vec.dot(&hit.normal)).powf(self.glossiness);
         // TODO: Specular default color
         let specular_color = Vec3::new(255., 255., 255.) * f * self.specular_coeff;
 
@@ -92,7 +90,6 @@ impl Material {
 }
 
 pub struct NormalMap {
-    seed: Seed,
     seed_val: u32,
     octaves: usize,
     wavelength: f32,
@@ -102,8 +99,7 @@ pub struct NormalMap {
 
 impl Clone for NormalMap {
     fn clone(&self) -> Self {
-        let seed = Seed::new(self.seed_val);
-        NormalMap { seed: seed, seed_val: self.seed_val, octaves: self.octaves,
+        NormalMap { seed_val: self.seed_val, octaves: self.octaves,
                     wavelength: self.wavelength,
                     persistence: self.persistence, lacunarity: self.lacunarity }
     }
@@ -112,29 +108,29 @@ impl Clone for NormalMap {
 impl NormalMap {
     pub fn new(seed_val: u32, octaves: usize, wavelength: f32, persistence: f32,
                lacunarity: f32) -> Self {
-        let seed = Seed::new(seed_val);
-
-        NormalMap { seed: seed, seed_val: seed_val, octaves: octaves, wavelength: wavelength,
+        NormalMap { seed_val: seed_val, octaves: octaves, wavelength: wavelength,
                     persistence: persistence, lacunarity: lacunarity }
     }
 
     fn map(&self, normal: &Vec3, hit_pos: &Vec3) -> Vec3 {
-        let noise = Brownian3::new(noise::perlin3, self.octaves)
-            .wavelength(self.wavelength)
-            .persistence(self.persistence)
-            .lacunarity(self.lacunarity);
-        let mut val = noise.apply(&self.seed, &[hit_pos.x, hit_pos.y, hit_pos.z]) + 1.0;
+        let noise = Fbm::new()
+            .set_octaves(self.octaves)
+            .set_seed(self.seed_val)
+            .set_frequency(self.wavelength as f64) // TODO: frequency, not wavelength
+            .set_persistence(self.persistence as f64) // TODO: f64
+            .set_lacunarity(self.lacunarity as f64); // TODO: f64
+
+        let mut val = noise.get([hit_pos.x as f64, hit_pos.y as f64, hit_pos.z as f64]) + 1.0;
         val = val / 2.;
 
         if val < 0. {
             val = 0.
         }
-        (*normal + Vec3::new(val, val, val)).normalize()
+        (*normal + Vec3::new(val as f32, val as f32, val as f32)).normalize()
     }
 }
 
 pub struct DisplacementMap {
-    seed: Seed,
     seed_val: u32,
     octaves: usize,
     wavelength: f32,
@@ -144,8 +140,7 @@ pub struct DisplacementMap {
 
 impl Clone for DisplacementMap {
     fn clone(&self) -> Self {
-        let seed = Seed::new(self.seed_val);
-        DisplacementMap { seed: seed, seed_val: self.seed_val, octaves: self.octaves,
+        DisplacementMap { seed_val: self.seed_val, octaves: self.octaves,
                           wavelength: self.wavelength,
                           persistence: self.persistence, lacunarity: self.lacunarity }
     }
@@ -154,23 +149,24 @@ impl Clone for DisplacementMap {
 impl DisplacementMap {
     pub fn new(seed_val: u32, octaves: usize, wavelength: f32, persistence: f32,
                lacunarity: f32) -> Self {
-        let seed = Seed::new(seed_val);
-
-        DisplacementMap { seed: seed, seed_val: seed_val, octaves: octaves, wavelength: wavelength,
+        DisplacementMap { seed_val: seed_val, octaves: octaves, wavelength: wavelength,
                           persistence: persistence, lacunarity: lacunarity }
     }
 
     fn map(&self, hit_pos: &Vec3) -> Vec3 {
-        let noise = Brownian3::new(noise::perlin3, self.octaves)
-            .wavelength(self.wavelength)
-            .persistence(self.persistence)
-            .lacunarity(self.lacunarity);
-        let mut val = noise.apply(&self.seed, &[hit_pos.x, hit_pos.y, hit_pos.z]) + 1.0;
+        let noise = Fbm::new()
+            .set_octaves(self.octaves)
+            .set_seed(self.seed_val)
+            .set_frequency(self.wavelength as f64) // TODO: frequency, not wavelength
+            .set_persistence(self.persistence as f64) // TODO: f64
+            .set_lacunarity(self.lacunarity as f64); // TODO: f64
+
+        let mut val = noise.get([hit_pos.x as f64, hit_pos.y as f64, hit_pos.z as f64]) + 1.0;
         //let mut val = val / 2.;
 
         if val < 0. {
             val = 0.
         }
-        *hit_pos + Vec3::new(val, val, val)
+        *hit_pos + Vec3::new(val as f32, val as f32, val as f32)
     }
 }

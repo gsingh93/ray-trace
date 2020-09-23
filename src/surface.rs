@@ -4,8 +4,6 @@ use Vec3;
 use material::Material;
 use ray::{Intersection, Ray};
 
-use nalgebra::{dot, cross, Norm};
-
 pub trait Surface {
     fn intersect(&self, &Ray) -> Option<Intersection>;
     fn material(&self) -> &Material;
@@ -36,7 +34,7 @@ impl Surface for Sphere {
 
     fn intersect(&self, ray: &Ray) -> Option<Intersection> {
         let center_offset = ray.origin - self.pos;
-        let b = 2. * dot(&ray.dir, &center_offset);
+        let b = 2. * ray.dir.dot(&center_offset);
         let c = center_offset.norm_squared() - self.radius * self.radius;
 
         let discriminant = b * b - 4. * c;
@@ -105,19 +103,19 @@ impl Surface for Plane {
     }
 
     fn intersect(&self, ray: &Ray) -> Option<Intersection> {
-        let denom = dot(&ray.dir, &self.normal);
+        let denom = ray.dir.dot(&self.normal);
         if denom == 0. {
             return None;
         }
-        let d = dot(&self.normal, &(self.point - ray.origin)) / denom;
+        let d = self.normal.dot(&(self.point - ray.origin)) / denom;
         if d > 0. {
             let pos = ray.origin + ray.dir * d;
 
             let n = &self.normal;
-            let u_axis = Vec3 { x: n.y, y: n.z, z: -n.x };
-            let v_axis = cross(&u_axis, n);
-            let u = dot(&pos, &u_axis);
-            let v = dot(&pos, &v_axis);
+            let u_axis = Vec3::new(n.y, n.z, -n.x);
+            let v_axis = u_axis.cross(n);
+            let u = pos.dot(&u_axis);
+            let v = pos.dot(&v_axis);
 
             let normal = if self.material.has_normal_map() {
                 self.material.apply_normal_map(&self.normal, &pos)

@@ -1,10 +1,10 @@
 use Vec3;
 
-use image::{self, ImageRgb8, RgbImage};
+use image::{self, DynamicImage, RgbImage};
 
 pub trait Texture {
     fn color(&self, u: f32, v: f32) -> Vec3;
-    fn clone_(&self) -> Box<Texture>;
+    fn clone_(&self) -> Box<dyn Texture>;
 }
 
 #[derive(Clone)]
@@ -46,7 +46,7 @@ impl Texture for CheckerboardTexture {
         }
     }
 
-    fn clone_(&self) -> Box<Texture> {
+    fn clone_(&self) -> Box<dyn Texture> {
         Box::new(self.clone())
     }
 }
@@ -59,7 +59,7 @@ pub struct ImageTexture {
 impl ImageTexture {
     pub fn new(filename: &str) -> Self {
         let image = image::open(filename).unwrap();
-        if let ImageRgb8(im) = image {
+        if let DynamicImage::ImageRgb8(im) = image {
             ImageTexture { image: im }
         } else {
             panic!("Only RGB textures are supported");
@@ -73,11 +73,11 @@ impl Texture for ImageTexture {
         let v = (v % 1.) * (self.image.height() as f32 - 1.);
 
         // TODO: Bilinear sampling
-        let p = self.image.get_pixel(u as u32, v as u32);
-        Vec3::new(p.data[0] as f32, p.data[1] as f32, p.data[2] as f32)
+        let &image::Rgb([r, g, b]) = self.image.get_pixel(u as u32, v as u32);
+        Vec3::new(r as f32, g as f32, b as f32)
     }
 
-    fn clone_(&self) -> Box<Texture> {
+    fn clone_(&self) -> Box<dyn Texture> {
         Box::new(self.clone())
     }
 }

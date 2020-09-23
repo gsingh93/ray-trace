@@ -16,7 +16,7 @@ use surface::Surface;
 
 use image::{RgbImage, Rgb, Pixel};
 
-use nalgebra::{clamp, cross, dot, Norm};
+use nalgebra::clamp;
 
 pub type Vec3 = nalgebra::Vector3<f32>;
 
@@ -30,8 +30,8 @@ pub struct Camera {
 
 impl Camera {
     pub fn new(pos: Vec3, dir: Vec3, up: Vec3) -> Self {
-        let right = cross(&up, &dir).normalize();
-        let up = cross(&right, &dir).normalize();
+        let right = up.cross(&dir).normalize();
+        let up = right.cross(&dir).normalize();
         Camera { pos: pos, dir: dir.normalize(), up: up, right: right }
     }
 
@@ -51,7 +51,7 @@ impl Camera {
 }
 
 pub struct Scene {
-    objects: Vec<Box<Surface>>,
+    objects: Vec<Box<dyn Surface>>,
     lights: Vec<PointLight>,
     ambient_coeff: f32,
     ambient_color: Vec3,
@@ -59,7 +59,7 @@ pub struct Scene {
 }
 
 impl Scene {
-    pub fn new(objects: Vec<Box<Surface>>,
+    pub fn new(objects: Vec<Box<dyn Surface>>,
            lights: Vec<PointLight>,
            ambient_coeff: f32,
            ambient_color: Vec3,
@@ -73,7 +73,7 @@ impl Scene {
         }
     }
 
-    fn intersect(&self, ray: &Ray) -> Option<(&Box<Surface>, Intersection)> {
+    fn intersect(&self, ray: &Ray) -> Option<(&Box<dyn Surface>, Intersection)> {
         let mut result = None;
         for obj in self.objects.iter() {
             if let Some(hit) = obj.intersect(ray) {
@@ -113,7 +113,7 @@ fn trace_ray(scene: &Scene, ray: &Ray, depth: u16, max_depth: u16) -> Vec3 {
         let material = obj.material();
 
         // Ambient color
-        color = material.raw_color() * (scene.ambient_color / 255.) * scene.ambient_coeff;
+        color = material.raw_color().component_mul(&((scene.ambient_color / 255.) * scene.ambient_coeff));
 
         // Trace shadow rays
         for light in scene.lights.iter() {
@@ -124,13 +124,13 @@ fn trace_ray(scene: &Scene, ray: &Ray, depth: u16, max_depth: u16) -> Vec3 {
             if let Some((_, shadow_hit)) = scene.intersect(&shadow_ray) {
                 if shadow_hit.dist > dist {
                     // Diffuse/specular color
-                    color = color + material.color(&shadow_ray, &ray, &hit)
-                        * (*light.color() / 255.) * light.intensity();
+                    color = color + material.color(&shadow_ray, &ray, &hit).component_mul(
+                        &((*light.color() / 255.) * light.intensity()));
                 }
             } else {
                 // Diffuse/specular color
-                color = color + material.color(&shadow_ray, &ray, &hit)
-                    * (*light.color() / 255.) * light.intensity();
+                color = color + material.color(&shadow_ray, &ray, &hit).component_mul(
+                    &((*light.color() / 255.) * light.intensity()));
             }
         }
 
@@ -151,6 +151,6 @@ fn trace_ray(scene: &Scene, ray: &Ray, depth: u16, max_depth: u16) -> Vec3 {
 
 fn reflected_ray(ray: &Ray, hit: &Intersection) -> Ray {
     let pos = hit.pos + hit.normal * f32::EPSILON.sqrt();
-    let dir = ray.dir - hit.normal * 2. * dot(&ray.dir, &hit.normal);
+    let dir = ray.dir - hit.normal * 2. * ray.dir.dot(&hit.normal);
     Ray::new(pos, dir)
 }

@@ -1,7 +1,5 @@
 use Vec3;
 
-use nalgebra::Norm;
-
 #[derive(Debug)]
 pub struct Ray {
     pub origin: Vec3,

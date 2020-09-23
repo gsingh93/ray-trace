@@ -14,8 +14,7 @@ use tracerlib::material::{DisplacementMap, Material, NormalMap};
 use tracerlib::surface::{Plane, Sphere, Surface};
 use tracerlib::texture::{CheckerboardTexture, ImageTexture, Texture};
 
-use image::FilterType;
-use image::imageops::resize;
+use image::imageops::{resize, FilterType};
 
 struct Config {
     width: u32,
@@ -32,12 +31,13 @@ impl Config {
         File::open(filename).unwrap().read_to_string(&mut toml_str).unwrap();
 
         let toml: toml::Value = toml_str.parse().unwrap();
-        let width = toml.lookup("config.width").unwrap().as_integer().unwrap();
-        let height = toml.lookup("config.height").unwrap().as_integer().unwrap();
-        let out_file = decode_string(toml.lookup("config.out_file").unwrap());
-        let samples = toml.lookup("config.samples").unwrap().as_integer().unwrap();
-        let depth = toml.lookup("config.reflection_depth").unwrap().as_integer().unwrap();
-        let scene_name = decode_string(toml.lookup("config.scene").unwrap());
+        let config = toml["config"].as_table().unwrap();
+        let width = config["width"].as_integer().unwrap();
+        let height = config["height"].as_integer().unwrap();
+        let out_file = decode_string(&config["out_file"]);
+        let samples = config["samples"].as_integer().unwrap();
+        let depth = config["reflection_depth"].as_integer().unwrap();
+        let scene_name = decode_string(&config["scene"]);
 
         Config {
             width: width as u32,
@@ -71,13 +71,13 @@ fn setup_scene(scene: &str) -> Scene {
 
     let toml: toml::Value = toml_str.parse().unwrap();
 
-    let materials = decode_materials(toml.lookup("material").unwrap());
-    decode_scene(toml.lookup("scene").unwrap(), materials)
+    let materials = decode_materials(&toml["material"]);
+    decode_scene(&toml["scene"], materials)
 }
 
 fn decode_materials(materials: &toml::Value) -> BTreeMap<String, Material> {
     let mut map = BTreeMap::new();
-    for material in materials.as_slice().unwrap() {
+    for material in materials.as_array().unwrap() {
         let (name, m) = decode_material(material);
         map.insert(name, m);
     }
@@ -85,25 +85,25 @@ fn decode_materials(materials: &toml::Value) -> BTreeMap<String, Material> {
 }
 
 fn decode_material(material: &toml::Value) -> (String, Material) {
-    let name = decode_string(material.lookup("name").unwrap());
-    let color = decode_vec3(material.lookup("color").unwrap());
-    let diffuse = material.lookup("diffuse").unwrap().as_float().unwrap() as f32;
-    let specular = material.lookup("specular").unwrap().as_float().unwrap() as f32;
-    let glossiness = material.lookup("glossiness").unwrap().as_float().unwrap() as f32;
-    let reflectivity = material.lookup("reflectivity").unwrap().as_float().unwrap() as f32;
-    let texture = if let Some(checkerboard) = material.lookup("checkerboard") {
+    let name = decode_string(&material["name"]);
+    let color = decode_vec3(&material["color"]);
+    let diffuse = material["diffuse"].as_float().unwrap() as f32;
+    let specular = material["specular"].as_float().unwrap() as f32;
+    let glossiness = material["glossiness"].as_float().unwrap() as f32;
+    let reflectivity = material["reflectivity"].as_float().unwrap() as f32;
+    let texture = if let Some(checkerboard) = material.get("checkerboard") {
         Some(Box::new(CheckerboardTexture::new(checkerboard.as_float().unwrap() as f32))
-             as Box<Texture>)
+             as Box<dyn Texture>)
     } else {
-        if let Some(texture) = material.lookup("texture") {
-            Some(Box::new(ImageTexture::new(texture.as_str().unwrap())) as Box<Texture>)
+        if let Some(texture) = material.get("texture") {
+            Some(Box::new(ImageTexture::new(texture.as_str().unwrap())) as Box<dyn Texture>)
         } else {
             None
         }
     };
 
-    let normal_map = if let Some(map) = material.lookup("normal_map") {
-        let v = map.as_slice().unwrap();
+    let normal_map = if let Some(map) = material.get("normal_map") {
+        let v = map.as_array().unwrap();
         let seed = v[0].as_float().unwrap() as u32;
         let octaves = v[1].as_float().unwrap() as usize;
         let wavelength = v[2].as_float().unwrap() as f32;
@@ -114,8 +114,8 @@ fn decode_material(material: &toml::Value) -> (String, Material) {
         None
     };
 
-    let displacement_map = if let Some(map) = material.lookup("displacement_map") {
-        let v = map.as_slice().unwrap();
+    let displacement_map = if let Some(map) = material.get("displacement_map") {
+        let v = map.as_array().unwrap();
         let seed = v[0].as_float().unwrap() as u32;
         let octaves = v[1].as_float().unwrap() as usize;
         let wavelength = v[2].as_float().unwrap() as f32;
@@ -131,36 +131,36 @@ fn decode_material(material: &toml::Value) -> (String, Material) {
 }
 
 fn decode_scene(scene: &toml::Value, materials: BTreeMap<String, Material>) -> Scene {
-    let camera = decode_camera(scene.lookup("camera").unwrap());
-    let surfaces = decode_surfaces(scene.lookup("surface").unwrap(), materials);
-    let lights = decode_lights(scene.lookup("light").unwrap());
-    let ambient_const = scene.lookup("ambient_const").unwrap().as_float().unwrap() as f32;
-    let ambient_color = decode_vec3(scene.lookup("ambient_color").unwrap());
+    let camera = decode_camera(&scene["camera"]);
+    let surfaces = decode_surfaces(&scene["surface"], materials);
+    let lights = decode_lights(&scene["light"]);
+    let ambient_const = scene["ambient_const"].as_float().unwrap() as f32;
+    let ambient_color = decode_vec3(&scene["ambient_color"]);
 
     Scene::new(surfaces, lights, ambient_const, ambient_color, camera)
 }
 
 fn decode_camera(camera: &toml::Value) -> Camera {
-    let pos = decode_vec3(camera.lookup("pos").unwrap());
-    let lookat = decode_vec3(camera.lookup("lookat").unwrap());
-    let up = decode_vec3(camera.lookup("up").unwrap());
+    let pos = decode_vec3(&camera["pos"]);
+    let lookat = decode_vec3(&camera["lookat"]);
+    let up = decode_vec3(&camera["up"]);
     Camera::from_lookat(pos, lookat, up)
 }
 
 fn decode_surfaces(surfaces: &toml::Value, materials: BTreeMap<String, Material>)
-                   -> Vec<Box<Surface>> {
+                   -> Vec<Box<dyn Surface>> {
     let mut v = Vec::new();
-    for surface in surfaces.as_slice().unwrap() {
+    for surface in surfaces.as_array().unwrap() {
         v.push(decode_surface(surface, &materials))
     }
     v
 }
 
-fn decode_surface(surface: &toml::Value, materials: &BTreeMap<String, Material>) -> Box<Surface> {
-    let material_name = surface.lookup("material").unwrap().as_str().unwrap();
+fn decode_surface(surface: &toml::Value, materials: &BTreeMap<String, Material>) -> Box<dyn Surface> {
+    let material_name = surface["material"].as_str().unwrap();
     let material = materials.get(material_name).unwrap().clone();
 
-    let type_ = surface.lookup("type").unwrap().as_str().unwrap();
+    let type_ = surface["type"].as_str().unwrap();
     match type_ {
         "plane" => Box::new(decode_plane(surface, material)),
         "sphere" => Box::new(decode_sphere(surface, material)),
@@ -169,31 +169,31 @@ fn decode_surface(surface: &toml::Value, materials: &BTreeMap<String, Material>)
 }
 
 fn decode_sphere(sphere: &toml::Value, material: Material) -> Sphere {
-    let pos = decode_vec3(sphere.lookup("pos").unwrap());
-    let radius = sphere.lookup("radius").unwrap().as_float().unwrap() as f32;
+    let pos = decode_vec3(&sphere["pos"]);
+    let radius = sphere["radius"].as_float().unwrap() as f32;
 
     Sphere::new(pos, radius, material)
 }
 
 fn decode_plane(plane: &toml::Value, material: Material) -> Plane {
-    let pos = decode_vec3(plane.lookup("pos").unwrap());
-    let normal = decode_vec3(plane.lookup("normal").unwrap());
+    let pos = decode_vec3(&plane["pos"]);
+    let normal = decode_vec3(&plane["normal"]);
 
     Plane::new(pos, normal, material)
 }
 
 fn decode_lights(lights: &toml::Value) -> Vec<PointLight> {
     let mut v = Vec::new();
-    for light in lights.as_slice().unwrap() {
+    for light in lights.as_array().unwrap() {
         v.push(decode_light(light))
     }
     v
 }
 
 fn decode_light(light: &toml::Value) -> PointLight {
-    let pos = decode_vec3(light.lookup("pos").unwrap());
-    let color = decode_vec3(light.lookup("color").unwrap());
-    let intensity = light.lookup("intensity").unwrap().as_float().unwrap() as f32;
+    let pos = decode_vec3(&light["pos"]);
+    let color = decode_vec3(&light["color"]);
+    let intensity = light["intensity"].as_float().unwrap() as f32;
 
     PointLight::new(pos, color, intensity)
 }
@@ -203,7 +203,7 @@ fn decode_string(s: &toml::Value) -> String {
 }
 
 fn decode_vec3(vec: &toml::Value) -> Vec3 {
-    let v = vec.as_slice().unwrap();
+    let v = vec.as_array().unwrap();
     if v[0].as_float().is_none() {
         Vec3::new(v[0].as_integer().unwrap() as f32,
                   v[1].as_integer().unwrap() as f32,
