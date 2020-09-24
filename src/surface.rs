@@ -20,9 +20,9 @@ pub struct Sphere {
 impl Sphere {
     pub fn new(pos: Vec3, radius: f32, material: Material) -> Self {
         Sphere {
-            pos: pos,
-            radius: radius,
-            material: material,
+            pos,
+            radius,
+            material,
         }
     }
 }
@@ -94,9 +94,9 @@ pub struct Plane {
 impl Plane {
     pub fn new(point: Vec3, normal: Vec3, material: Material) -> Self {
         Plane {
-            point: point,
-            normal: normal,
-            material: material,
+            point,
+            normal,
+            material,
         }
     }
 }

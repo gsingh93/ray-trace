@@ -29,10 +29,10 @@ impl Camera {
         let right = up.cross(&dir).normalize();
         let up = right.cross(&dir).normalize();
         Camera {
-            pos: pos,
+            pos,
+            up,
+            right,
             dir: dir.normalize(),
-            up: up,
-            right: right,
         }
     }
 
@@ -68,11 +68,11 @@ impl Scene {
         camera: Camera,
     ) -> Self {
         Scene {
-            objects: objects,
-            lights: lights,
-            ambient_coeff: ambient_coeff,
-            ambient_color: ambient_color,
-            camera: camera,
+            objects,
+            lights,
+            ambient_coeff,
+            ambient_color,
+            camera,
         }
     }
 
@@ -134,17 +134,15 @@ fn trace_ray(scene: &Scene, ray: &Ray, depth: u16, max_depth: u16) -> Vec3 {
             if let Some((_, shadow_hit)) = scene.intersect(&shadow_ray) {
                 if shadow_hit.dist > dist {
                     // Diffuse/specular color
-                    color = color
-                        + material
-                            .color(&shadow_ray, &ray, &hit)
-                            .component_mul(&((*light.color() / 255.) * light.intensity()));
+                    color += material
+                        .color(&shadow_ray, &ray, &hit)
+                        .component_mul(&((*light.color() / 255.) * light.intensity()));
                 }
             } else {
                 // Diffuse/specular color
-                color = color
-                    + material
-                        .color(&shadow_ray, &ray, &hit)
-                        .component_mul(&((*light.color() / 255.) * light.intensity()));
+                color += material
+                    .color(&shadow_ray, &ray, &hit)
+                    .component_mul(&((*light.color() / 255.) * light.intensity()));
             }
         }
 
@@ -157,7 +155,7 @@ fn trace_ray(scene: &Scene, ray: &Ray, depth: u16, max_depth: u16) -> Vec3 {
         if reflectivity > 0. {
             let reflected_ray = reflected_ray(ray, &hit);
             let reflected_color = trace_ray(scene, &reflected_ray, depth + 1, max_depth);
-            color = color + reflected_color * reflectivity;
+            color += reflected_color * reflectivity;
         }
     }
     color

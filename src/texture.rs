@@ -14,7 +14,7 @@ pub struct CheckerboardTexture {
 
 impl CheckerboardTexture {
     pub fn new(dim: f32) -> Self {
-        CheckerboardTexture { dim: dim }
+        CheckerboardTexture { dim }
     }
 }
 

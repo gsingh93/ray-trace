@@ -99,12 +99,10 @@ fn decode_material(material: &toml::Value) -> (String, Material) {
         Some(Box::new(CheckerboardTexture::new(
             checkerboard.as_float().unwrap() as f32
         )) as Box<dyn Texture>)
+    } else if let Some(texture) = material.get("texture") {
+        Some(Box::new(ImageTexture::new(texture.as_str().unwrap())) as Box<dyn Texture>)
     } else {
-        if let Some(texture) = material.get("texture") {
-            Some(Box::new(ImageTexture::new(texture.as_str().unwrap())) as Box<dyn Texture>)
-        } else {
-            None
-        }
+        None
     };
 
     let normal_map = if let Some(map) = material.get("normal_map") {

@@ -26,8 +26,8 @@ impl Clone for Material {
             glossiness: self.glossiness,
             reflectivity: self.reflectivity,
             texture: self.texture.as_ref().map(|t| t.clone_()),
-            normal_map: self.normal_map.as_ref().map(|m| m.clone()),
-            displacement_map: self.displacement_map.as_ref().map(|m| m.clone()),
+            normal_map: self.normal_map.as_ref().cloned(),
+            displacement_map: self.displacement_map.as_ref().cloned(),
         }
     }
 }
@@ -44,14 +44,14 @@ impl Material {
         displacement_map: Option<DisplacementMap>,
     ) -> Self {
         Material {
-            color: color,
-            diffuse_coeff: diffuse_coeff,
-            specular_coeff: specular_coeff,
-            glossiness: glossiness,
-            reflectivity: reflectivity,
-            texture: texture,
-            normal_map: normal_map,
-            displacement_map: displacement_map,
+            color,
+            diffuse_coeff,
+            specular_coeff,
+            glossiness,
+            reflectivity,
+            texture,
+            normal_map,
+            displacement_map,
         }
     }
 
@@ -90,15 +90,15 @@ impl Material {
 
     pub fn apply_normal_map(&self, normal: &Vec3, hit_pos: &Vec3) -> Vec3 {
         match &self.normal_map {
-            &Some(ref map) => map.map(normal, hit_pos),
-            &None => *normal,
+            Some(map) => map.map(normal, hit_pos),
+            None => *normal,
         }
     }
 
     pub fn apply_displacement_map(&self, hit_pos: &Vec3) -> Vec3 {
         match &self.displacement_map {
-            &Some(ref map) => map.map(hit_pos),
-            &None => *hit_pos,
+            Some(map) => map.map(hit_pos),
+            None => *hit_pos,
         }
     }
 }
@@ -132,11 +132,11 @@ impl NormalMap {
         lacunarity: f32,
     ) -> Self {
         NormalMap {
-            seed_val: seed_val,
-            octaves: octaves,
-            wavelength: wavelength,
-            persistence: persistence,
-            lacunarity: lacunarity,
+            seed_val,
+            octaves,
+            wavelength,
+            persistence,
+            lacunarity,
         }
     }
 
@@ -149,7 +149,7 @@ impl NormalMap {
             .set_lacunarity(self.lacunarity as f64); // TODO: f64
 
         let mut val = noise.get([hit_pos.x as f64, hit_pos.y as f64, hit_pos.z as f64]) + 1.0;
-        val = val / 2.;
+        val /= 2.;
 
         if val < 0. {
             val = 0.
@@ -187,11 +187,11 @@ impl DisplacementMap {
         lacunarity: f32,
     ) -> Self {
         DisplacementMap {
-            seed_val: seed_val,
-            octaves: octaves,
-            wavelength: wavelength,
-            persistence: persistence,
-            lacunarity: lacunarity,
+            seed_val,
+            octaves,
+            wavelength,
+            persistence,
+            lacunarity,
         }
     }
 
