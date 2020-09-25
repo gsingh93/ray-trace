@@ -1,3 +1,5 @@
+mod config;
+
 use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::Read;
@@ -10,65 +12,26 @@ use tracerlib::{ray_trace, Camera, Scene, Vec3};
 
 use image::imageops::{resize, FilterType};
 
-struct Config {
-    width: u32,
-    height: u32,
-    out_file: String,
-    samples: u32,
-    reflection_depth: u16,
-    scene: String,
-}
-
-impl Config {
-    fn new(filename: &str) -> Self {
-        let mut toml_str = String::new();
-        File::open(filename)
-            .unwrap()
-            .read_to_string(&mut toml_str)
-            .unwrap();
-
-        let toml: toml::Value = toml_str.parse().unwrap();
-        let config = toml["config"].as_table().unwrap();
-        let width = config["width"].as_integer().unwrap();
-        let height = config["height"].as_integer().unwrap();
-        let out_file = decode_string(&config["out_file"]);
-        let samples = config["samples"].as_integer().unwrap();
-        let depth = config["reflection_depth"].as_integer().unwrap();
-        let scene_name = decode_string(&config["scene"]);
-
-        Config {
-            width: width as u32,
-            height: height as u32,
-            out_file: out_file,
-            samples: samples as u32,
-            reflection_depth: depth as u16,
-            scene: scene_name,
-        }
-    }
-}
+use config::Config;
 
 fn main() {
     let config = Config::new("config.toml");
-    let scene = setup_scene(&config.scene);
+    let scene = setup_scene(&config.scene_config);
 
     let im = ray_trace(
         &scene,
-        config.samples * config.width,
-        config.samples * config.height,
+        config.supersampling * config.width,
+        config.supersampling * config.height,
         config.reflection_depth,
     );
 
     let im = resize(&im, config.width, config.height, FilterType::Triangle);
-    im.save(&config.out_file).unwrap();
+    im.save(&config.output_file).unwrap();
 }
 
-fn setup_scene(scene: &str) -> Scene {
-    let mut path = String::new();
-    path.push_str("scenes/");
-    path.push_str(&scene);
-
+fn setup_scene(scene_config: &str) -> Scene {
     let mut toml_str = String::new();
-    File::open(path)
+    File::open(scene_config)
         .unwrap()
         .read_to_string(&mut toml_str)
         .unwrap();

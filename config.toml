@@ -1,7 +1,6 @@
-[config]
-scene = "sphere.toml"
+scene_config = "scenes/sphere.toml"
+output_file = "image.png"
 width = 640
 height = 480
-samples = 1
-out_file = "image.png"
+supersampling = 1
 reflection_depth = 1
