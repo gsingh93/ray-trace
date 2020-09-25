@@ -13,7 +13,7 @@ name = "ray-tracer"
 path = "src/main.rs"
 
 [dependencies]
-image = "*"
-nalgebra = "*"
-noise = "*"
-toml = "*"
+image = "0.23.9"
+nalgebra = "0.22.0"
+noise = "0.6.0"
+toml = "0.5.6"
