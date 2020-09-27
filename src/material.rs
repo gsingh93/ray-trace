@@ -6,6 +6,7 @@ use crate::Vec3;
 
 use noise::{Fbm, MultiFractal, NoiseFn, Seedable};
 
+#[derive(Clone)]
 pub struct Material {
     color: Vec3,
     diffuse_coeff: f32,
@@ -15,21 +16,6 @@ pub struct Material {
     texture: Option<Box<dyn Texture>>,
     normal_map: Option<NormalMap>,
     displacement_map: Option<DisplacementMap>,
-}
-
-impl Clone for Material {
-    fn clone(&self) -> Material {
-        Material {
-            color: self.color,
-            diffuse_coeff: self.diffuse_coeff,
-            specular_coeff: self.specular_coeff,
-            glossiness: self.glossiness,
-            reflectivity: self.reflectivity,
-            texture: self.texture.clone(),
-            normal_map: self.normal_map.clone(),
-            displacement_map: self.displacement_map.clone(),
-        }
-    }
 }
 
 impl Material {
@@ -103,24 +89,13 @@ impl Material {
     }
 }
 
+#[derive(Clone)]
 pub struct NormalMap {
     seed_val: u32,
     octaves: usize,
     wavelength: f32,
     persistence: f32,
     lacunarity: f32,
-}
-
-impl Clone for NormalMap {
-    fn clone(&self) -> Self {
-        NormalMap {
-            seed_val: self.seed_val,
-            octaves: self.octaves,
-            wavelength: self.wavelength,
-            persistence: self.persistence,
-            lacunarity: self.lacunarity,
-        }
-    }
 }
 
 impl NormalMap {
@@ -158,24 +133,13 @@ impl NormalMap {
     }
 }
 
+#[derive(Clone)]
 pub struct DisplacementMap {
     seed_val: u32,
     octaves: usize,
     wavelength: f32,
     persistence: f32,
     lacunarity: f32,
-}
-
-impl Clone for DisplacementMap {
-    fn clone(&self) -> Self {
-        DisplacementMap {
-            seed_val: self.seed_val,
-            octaves: self.octaves,
-            wavelength: self.wavelength,
-            persistence: self.persistence,
-            lacunarity: self.lacunarity,
-        }
-    }
 }
 
 impl DisplacementMap {
