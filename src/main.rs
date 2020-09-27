@@ -1,22 +1,27 @@
 mod config;
 
 use std::collections::BTreeMap;
-use std::fs::File;
-use std::io::Read;
 
 use tracerlib::light::PointLight;
 use tracerlib::material::{DisplacementMap, Material, NormalMap};
 use tracerlib::surface::{Plane, Sphere, Surface};
 use tracerlib::texture::{CheckerboardTexture, ImageTexture, Texture};
-use tracerlib::{ray_trace, Camera, Scene, Vec3};
+use tracerlib::{ray_trace, Camera, Scene};
 
 use image::imageops::{resize, FilterType};
 
-use config::Config;
+use anyhow::{Context, Result};
 
-fn main() {
-    let config = Config::new("config.toml");
-    let scene = setup_scene(&config.scene_config);
+use config::{
+    CameraConfig, Config, LightConfig, MaterialConfig, SceneConfig, SurfaceConfig,
+    SurfaceConfigOptions, TextureConfig, TextureConfigOptions,
+};
+
+fn main() -> Result<()> {
+    let config = Config::new("config.json").context("Failed to load config")?;
+    let scene_config =
+        SceneConfig::new(&config.scene_config_path).context("Failed to load scene config")?;
+    let scene = create_scene(scene_config).context("Failed to create scene")?;
 
     let im = ray_trace(
         &scene,
@@ -26,186 +31,130 @@ fn main() {
     );
 
     let im = resize(&im, config.width, config.height, FilterType::Triangle);
-    im.save(&config.output_file).unwrap();
+    im.save(&config.output_file).context("Failed to save file")
 }
 
-fn setup_scene(scene_config: &str) -> Scene {
-    let mut toml_str = String::new();
-    File::open(scene_config)
-        .unwrap()
-        .read_to_string(&mut toml_str)
-        .unwrap();
+fn create_scene(scene: SceneConfig) -> Result<Scene> {
+    let textures = load_textures(scene.textures).context("Failed to load textures")?;
+    let materials =
+        load_materials(scene.materials, &textures).context("Failed to load materials")?;
+    let surfaces = load_surfaces(scene.surfaces, &materials).context("Failed to load surfaces")?;
+    let lights = load_lights(scene.lights);
+    let camera = load_camera(scene.camera);
 
-    let toml: toml::Value = toml_str.parse().unwrap();
-
-    let materials = decode_materials(&toml["material"]);
-    decode_scene(&toml["scene"], materials)
+    Ok(Scene::new(
+        surfaces,
+        lights,
+        scene.ambient_const,
+        scene.ambient_color,
+        camera,
+    ))
 }
 
-fn decode_materials(materials: &toml::Value) -> BTreeMap<String, Material> {
+fn load_textures(textures: Vec<TextureConfig>) -> Result<BTreeMap<String, Box<dyn Texture>>> {
     let mut map = BTreeMap::new();
-    for material in materials.as_array().unwrap() {
-        let (name, m) = decode_material(material);
-        map.insert(name, m);
+    for texture in textures {
+        let t = load_texture(&texture).context("Failed to load texture")?;
+        // TODO
+        map.insert(texture.name.clone(), t);
     }
-    map
+    Ok(map)
 }
 
-fn decode_material(material: &toml::Value) -> (String, Material) {
-    let name = decode_string(&material["name"]);
-    let color = decode_vec3(&material["color"]);
-    let diffuse = material["diffuse"].as_float().unwrap() as f32;
-    let specular = material["specular"].as_float().unwrap() as f32;
-    let glossiness = material["glossiness"].as_float().unwrap() as f32;
-    let reflectivity = material["reflectivity"].as_float().unwrap() as f32;
-    let texture = if let Some(checkerboard) = material.get("checkerboard") {
-        Some(Box::new(CheckerboardTexture::new(
-            checkerboard.as_float().unwrap() as f32
-        )) as Box<dyn Texture>)
-    } else if let Some(texture) = material.get("texture") {
-        Some(Box::new(ImageTexture::new(texture.as_str().unwrap())) as Box<dyn Texture>)
+fn load_texture(texture: &TextureConfig) -> Result<Box<dyn Texture>> {
+    match &texture.options {
+        TextureConfigOptions::Image { file_path } => {
+            ImageTexture::new(file_path).map(|x| Box::new(x) as Box<dyn Texture>)
+        }
+        TextureConfigOptions::Checkerboard { dim } => Ok(Box::new(CheckerboardTexture::new(*dim))),
+    }
+}
+
+fn load_materials(
+    materials: Vec<MaterialConfig>,
+    textures: &BTreeMap<String, Box<dyn Texture>>,
+) -> Result<BTreeMap<String, Material>> {
+    let mut map = BTreeMap::new();
+    for material in materials {
+        let m = load_material(&material, &textures)?;
+        // TODO
+        map.insert(material.name.clone(), m);
+    }
+    Ok(map)
+}
+
+fn load_material(
+    material: &MaterialConfig,
+    textures: &BTreeMap<String, Box<dyn Texture>>,
+) -> Result<Material> {
+    let normal_map = material
+        .normal_map
+        .map(|nm| NormalMap::new(nm.0, nm.1, nm.2, nm.3, nm.4));
+    let displacement_map = material
+        .displacement_map
+        .map(|dm| DisplacementMap::new(dm.0, dm.1, dm.2, dm.3, dm.4));
+
+    let texture = if let Some(ref texture_name) = material.texture {
+        Some(
+            textures
+                .get(texture_name)
+                .cloned()
+                .with_context(|| format!("Texture {} not found", texture_name))?,
+        )
     } else {
         None
     };
 
-    let normal_map = if let Some(map) = material.get("normal_map") {
-        let v = map.as_array().unwrap();
-        let seed = v[0].as_float().unwrap() as u32;
-        let octaves = v[1].as_float().unwrap() as usize;
-        let wavelength = v[2].as_float().unwrap() as f32;
-        let persistence = v[3].as_float().unwrap() as f32;
-        let lacunarity = v[4].as_float().unwrap() as f32;
-        Some(NormalMap::new(
-            seed,
-            octaves,
-            wavelength,
-            persistence,
-            lacunarity,
-        ))
-    } else {
-        None
-    };
-
-    let displacement_map = if let Some(map) = material.get("displacement_map") {
-        let v = map.as_array().unwrap();
-        let seed = v[0].as_float().unwrap() as u32;
-        let octaves = v[1].as_float().unwrap() as usize;
-        let wavelength = v[2].as_float().unwrap() as f32;
-        let persistence = v[3].as_float().unwrap() as f32;
-        let lacunarity = v[4].as_float().unwrap() as f32;
-        Some(DisplacementMap::new(
-            seed,
-            octaves,
-            wavelength,
-            persistence,
-            lacunarity,
-        ))
-    } else {
-        None
-    };
-    let m = Material::new(
-        color,
-        diffuse,
-        specular,
-        glossiness,
-        reflectivity,
+    Ok(Material::new(
+        material.color,
+        material.diffuse,
+        material.specular,
+        material.glossiness,
+        material.reflectivity,
         texture,
         normal_map,
         displacement_map,
-    );
-    (name, m)
+    ))
 }
 
-fn decode_scene(scene: &toml::Value, materials: BTreeMap<String, Material>) -> Scene {
-    let camera = decode_camera(&scene["camera"]);
-    let surfaces = decode_surfaces(&scene["surface"], materials);
-    let lights = decode_lights(&scene["light"]);
-    let ambient_const = scene["ambient_const"].as_float().unwrap() as f32;
-    let ambient_color = decode_vec3(&scene["ambient_color"]);
-
-    Scene::new(surfaces, lights, ambient_const, ambient_color, camera)
-}
-
-fn decode_camera(camera: &toml::Value) -> Camera {
-    let pos = decode_vec3(&camera["pos"]);
-    let lookat = decode_vec3(&camera["lookat"]);
-    let up = decode_vec3(&camera["up"]);
-    Camera::from_lookat(pos, lookat, up)
-}
-
-fn decode_surfaces(
-    surfaces: &toml::Value,
-    materials: BTreeMap<String, Material>,
-) -> Vec<Box<dyn Surface>> {
-    let mut v = Vec::new();
-    for surface in surfaces.as_array().unwrap() {
-        v.push(decode_surface(surface, &materials))
-    }
-    v
-}
-
-fn decode_surface(
-    surface: &toml::Value,
+fn load_surfaces(
+    surfaces: Vec<SurfaceConfig>,
     materials: &BTreeMap<String, Material>,
-) -> Box<dyn Surface> {
-    let material_name = surface["material"].as_str().unwrap();
-    let material = materials.get(material_name).unwrap().clone();
+) -> Result<Vec<Box<dyn Surface>>> {
+    let mut v = Vec::new();
+    for surface in surfaces {
+        v.push(load_surface(surface, materials)?);
+    }
+    Ok(v)
+}
 
-    let type_ = surface["type"].as_str().unwrap();
-    match type_ {
-        "plane" => Box::new(decode_plane(surface, material)),
-        "sphere" => Box::new(decode_sphere(surface, material)),
-        _ => panic!("Unsupported object type: {}", type_),
+fn load_surface(
+    surface: SurfaceConfig,
+    materials: &BTreeMap<String, Material>,
+) -> Result<Box<dyn Surface>> {
+    let material = materials
+        .get(&surface.material)
+        .with_context(|| format!("Material {} not found", surface.material))?
+        .clone();
+
+    match surface.options {
+        SurfaceConfigOptions::Sphere { radius } => {
+            Ok(Box::new(Sphere::new(surface.pos, radius, material)))
+        }
+        SurfaceConfigOptions::Plane { normal } => {
+            Ok(Box::new(Plane::new(surface.pos, normal, material)))
+        }
     }
 }
 
-fn decode_sphere(sphere: &toml::Value, material: Material) -> Sphere {
-    let pos = decode_vec3(&sphere["pos"]);
-    let radius = sphere["radius"].as_float().unwrap() as f32;
-
-    Sphere::new(pos, radius, material)
-}
-
-fn decode_plane(plane: &toml::Value, material: Material) -> Plane {
-    let pos = decode_vec3(&plane["pos"]);
-    let normal = decode_vec3(&plane["normal"]);
-
-    Plane::new(pos, normal, material)
-}
-
-fn decode_lights(lights: &toml::Value) -> Vec<PointLight> {
+fn load_lights(lights: Vec<LightConfig>) -> Vec<PointLight> {
     let mut v = Vec::new();
-    for light in lights.as_array().unwrap() {
-        v.push(decode_light(light))
+    for light in lights {
+        v.push(PointLight::new(light.pos, light.color, light.intensity))
     }
     v
 }
 
-fn decode_light(light: &toml::Value) -> PointLight {
-    let pos = decode_vec3(&light["pos"]);
-    let color = decode_vec3(&light["color"]);
-    let intensity = light["intensity"].as_float().unwrap() as f32;
-
-    PointLight::new(pos, color, intensity)
-}
-
-fn decode_string(s: &toml::Value) -> String {
-    s.as_str().unwrap().to_owned()
-}
-
-fn decode_vec3(vec: &toml::Value) -> Vec3 {
-    let v = vec.as_array().unwrap();
-    if v[0].as_float().is_none() {
-        Vec3::new(
-            v[0].as_integer().unwrap() as f32,
-            v[1].as_integer().unwrap() as f32,
-            v[2].as_integer().unwrap() as f32,
-        )
-    } else {
-        Vec3::new(
-            v[0].as_float().unwrap() as f32,
-            v[1].as_float().unwrap() as f32,
-            v[2].as_float().unwrap() as f32,
-        )
-    }
+fn load_camera(camera: CameraConfig) -> Camera {
+    Camera::from_lookat(camera.pos, camera.lookat, camera.up)
 }

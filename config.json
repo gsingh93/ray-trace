@@ -1,0 +1,8 @@
+{
+    "scene_config_path": "scenes/sphere.json",
+    "output_file": "image.png",
+    "width": 640,
+    "height": 480,
+    "supersampling": 1,
+    "reflection_depth": 1
+}

@@ -1,0 +1,79 @@
+{
+    "ambient_const": 0.1,
+    "ambient_color": [255, 255, 255],
+    "camera": {
+        "pos": [0.0, 2.0, -5.0],
+        "lookat": [0.0, 1.0, 0.0],
+        "up": [0.0, 1.0, 0.0]
+
+    },
+    "textures": [
+        {
+            "name": "checkerboard",
+            "options": {
+                "checkerboard": {
+                    "dim": 1.0
+                }
+            }
+        },
+        {
+            "name": "wood",
+            "options": {
+                "image": {
+                    "file_path": "resources/wood.jpg"
+                }
+            }
+        }
+    ],
+    "materials": [
+        {
+            "name": "plane_material",
+            "color": [100, 100, 100],
+            "diffuse":  0.7,
+            "specular": 0.0,
+            "glossiness":  0.0,
+            "reflectivity":  1.0,
+            "texture": "checkerboard"
+        },
+        {
+            "name": "sphere_material",
+            "color": [208, 127, 64],
+            "diffuse":  0.3,
+            "specular": 0.2,
+            "glossiness":  20.0,
+            "reflectivity":  0.0,
+            "texture": "wood"
+        }
+    ],
+    "surfaces": [
+        {
+            "type": "sphere",
+            "material": "sphere_material",
+            "pos": [0.0, 1.0, 0.0],
+            "options": {
+                "sphere": {
+                    "radius": 1.0
+                }
+            }
+
+        },
+        {
+            "type": "plane",
+            "material": "plane_material",
+            "pos": [1.0, 0.0, 1.0],
+            "options": {
+                "plane": {
+                    "normal": [0.0, 1.0, 0.0]
+                }
+            }
+        }
+    ],
+    "lights": [
+        {
+            "type": "point",
+            "pos": [3.0, 3.0, -4.0],
+            "color": [0, 255, 0],
+            "intensity": 2.0
+        }
+    ]
+}

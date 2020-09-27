@@ -25,9 +25,9 @@ impl Clone for Material {
             specular_coeff: self.specular_coeff,
             glossiness: self.glossiness,
             reflectivity: self.reflectivity,
-            texture: self.texture.as_ref().map(|t| t.clone_()),
-            normal_map: self.normal_map.as_ref().cloned(),
-            displacement_map: self.displacement_map.as_ref().cloned(),
+            texture: self.texture.clone(),
+            normal_map: self.normal_map.clone(),
+            displacement_map: self.displacement_map.clone(),
         }
     }
 }

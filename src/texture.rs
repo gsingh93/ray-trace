@@ -1,10 +1,13 @@
 use crate::Vec3;
 
+use anyhow::{anyhow, Context, Result};
 use image::{self, DynamicImage, RgbImage};
 
-pub trait Texture {
+use dyn_clonable::*;
+
+#[clonable]
+pub trait Texture: Clone {
     fn color(&self, u: f32, v: f32) -> Vec3;
-    fn clone_(&self) -> Box<dyn Texture>;
 }
 
 #[derive(Clone)]
@@ -45,10 +48,6 @@ impl Texture for CheckerboardTexture {
             color2
         }
     }
-
-    fn clone_(&self) -> Box<dyn Texture> {
-        Box::new(self.clone())
-    }
 }
 
 #[derive(Clone)]
@@ -57,12 +56,13 @@ pub struct ImageTexture {
 }
 
 impl ImageTexture {
-    pub fn new(filename: &str) -> Self {
-        let image = image::open(filename).unwrap();
+    pub fn new(file_path: &str) -> Result<Self> {
+        let image =
+            image::open(file_path).with_context(|| format!("Failed to open {}", file_path))?;
         if let DynamicImage::ImageRgb8(im) = image {
-            ImageTexture { image: im }
+            Ok(ImageTexture { image: im })
         } else {
-            panic!("Only RGB textures are supported");
+            Err(anyhow!("Only RGB textures are supported"))
         }
     }
 }
@@ -75,9 +75,5 @@ impl Texture for ImageTexture {
         // TODO: Bilinear sampling
         let &image::Rgb([r, g, b]) = self.image.get_pixel(u as u32, v as u32);
         Vec3::new(r as f32, g as f32, b as f32)
-    }
-
-    fn clone_(&self) -> Box<dyn Texture> {
-        Box::new(self.clone())
     }
 }
